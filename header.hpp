@@ -43,5 +43,14 @@ namespace cxx_demangler
 	std::string parseArgumentList(std::string &s);
 	std::string parseBasicName(std::string &s);
 
+	struct templateArg{
+		std::string name;
+		std::string arguments;
+		templateArg();
+		void parse(std::string &str);
+		std::string toString();
+	};
+
+
 	int main();
 }

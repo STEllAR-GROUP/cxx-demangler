@@ -39,16 +39,15 @@ namespace cxx_demangler
 		storageClass sC;
 		qualification q;
 		qualifiedTypeCode qTC;
-		
-		bN.parse(str);
-		
-		std::string bn = bN.toString();
 
+		bN.parse(str);
+		std::string bn = bN.toString();
+		
 		if(consume(str,"@"))
 		{
 			//basicName, scope, unqualifiedtypecode, storageclass
 			scope = "global";
-			
+
 			uTC.parse(str);
 			
 			sC.parse(str);
@@ -71,14 +70,15 @@ namespace cxx_demangler
 			scope = "public:";
 			q.parse(str);
 			consume(str,"@");
+
 			qTC.parse(str);
 
 			if(qTC.isData) scope = "public: static";
-			
+
 			sC.parse(str);
-			
+
 			if(str_match(bn,"\\q")) bn = q.contents[0];
-			else if(str_match(bn,"~\\q")) bn = std::string("~").append(q.contents[0]);
+		else	if(str_match(bn,"~\\q")) bn = std::string("~").append(q.contents[0]);
 			
 			out = out
 			.append(scope)
@@ -111,6 +111,9 @@ namespace cxx_demangler
 int main(){
 	std::string args[] = 
 	{
+		"??$ConvertTo@DH@@YADABH@Z",
+		"?xyz@?$abc@V?$def@H@@PAX@@YAXXZ",
+		"Z",
 		"?myglobal@@3HA",
 		"?myStaticMember@myclass@@2HA",
 		"?myconstStaticMember@myclass@@2HB",

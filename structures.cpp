@@ -260,8 +260,8 @@ namespace cxx_demangler
 		std::string toString(std::string name)
 		{
 			if(this->isFunction) return this->fTypeCode.toString(name);
-	else	if(this->isData) return this->dataType.append(" ").append(name);
-	else	if(this->isStatic) return this->sTypeCode.toString(name);
+		else	if(this->isData) return this->dataType.append(" ").append(name);
+		else	if(this->isStatic) return this->sTypeCode.toString(name);
 		}
 	};
 
@@ -302,12 +302,17 @@ namespace cxx_demangler
 				this->isStatic = 1;
 				sTypeCode.parse(str);
 			}
+			else if(consume(str,"Y")) //complex
+			{
+				this->isStatic = 1;
+				sTypeCode.parse(str);
+			}
 		}
 		std::string toString(std::string name)
 		{
 			if(this->isFunction) return this->fTypeCode2.toString(name);
-	else	if(this->isData) return this->dataType.append(" ").append(name);
-	else	if(this->isStatic) return this->sTypeCode.toString(name);
+		else	if(this->isData) return this->dataType.append(" ").append(name);
+		else	if(this->isStatic) return this->sTypeCode.toString(name);
 		}
 	};
 
@@ -329,14 +334,27 @@ namespace cxx_demangler
 	*/
 	struct basicName{
 			int hasOperator;
+			int hasTemplate;
 			std::string operatorCode;
 			std::string nameFragment;
+			std::string templateStr;
 			basicName(){}
 			void parse(std::string &str)
 			{
 				this->hasOperator = 0;
+				this->hasTemplate = 0;
 				this->nameFragment = "";
-				if(consume(str,"?"))
+				this->templateStr = "";
+				
+				if(consume(str,"?$")) //Template
+				{
+					templateArg t;
+					t.parse(str);
+					this->hasTemplate = 1;
+					this->templateStr = t.toString();
+					return;
+				}
+				else if(consume(str,"?")) //Operator
 				{
 					char i = str[0];
 					this->operatorCode = getNextOpCode(str);
@@ -346,7 +364,7 @@ namespace cxx_demangler
 					this->hasOperator = 1;
 					return;
 				}
-				else
+				else //Name fragment
 				{
 					char c = consume1(str);
 
@@ -364,14 +382,41 @@ namespace cxx_demangler
 						c = consume1(str);
 					}
 					global_backref.insert(global_backref.end(),this->nameFragment);
+					return;
 				}
 			}
 			std::string toString()
 			{
 				if(this->hasOperator) return this->operatorCode;
+				else if(this->hasTemplate) return this->templateStr;
 				else return this->nameFragment;
 			}
 	};
+	
+	/* Name with Template Arguments
+		Name fragments starting with ?$ have template arguments. This kind of name looks like this:
+
+		    Prefix ?$
+		    Name terminated by @
+		    Template argument list
+
+		For example, we assume the following prototype.
+	*/
+		templateArg::templateArg(){}
+		void templateArg::parse(std::string &str)
+		{
+			basicName bN;
+			bN.parse(str);
+			this->name = bN.toString();
+			
+			argumentList aL;
+			aL.parse(str);
+			this->arguments = aL.toString();
+		}
+		std::string templateArg::toString()
+		{
+			return this->name.append("<").append(this->arguments).append(">");
+		}
 
 	/* Qualification:
 		( string '@' )* 
