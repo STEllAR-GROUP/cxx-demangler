@@ -22,6 +22,20 @@
 #include "./structures.cpp"
 #include "./datatypes.cpp"
 
+#include "./cxa_demangle.cpp"
+
+namespace gcc_demangler
+{
+	std::string demangle(std::string str)
+	{
+		int status;
+		const char* in = str.c_str();
+		char* out = abi::__cxa_demangle(in,0,0,&status);
+		std::string result(out);
+		return result;
+	}
+}
+
 namespace cxx_demangler
 {
 	/* MangledName:
@@ -195,5 +209,6 @@ int main(){
 		std::string result = cxx_demangler::demangle(args[i]);
 		std::cout << "O:\t" << result << std::endl << std::endl;
 	}
+	std::cout << gcc_demangler::demangle("_Z1fM1AKFvvE") << std::endl;
 	return 0;
 }
