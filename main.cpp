@@ -1,3 +1,9 @@
+/* Copyright (c) 2012 Michael LeSane
+ * 
+ * Distributed under the Boost Software License, Version 1.0. (See accompanying
+ * file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+*/
+
 #include <iostream>
 #include <vector>
 #include <string>
@@ -16,87 +22,90 @@
 #include "./structures.cpp"
 #include "./datatypes.cpp"
 
-/* MangledName:
-	'?' BasicName Qualification '@' QualifiedTypeCode StorageClass
-	'?' BasicName '@' UnqualifiedTypeCode StorageClass
-*/
-std::string parseMangledName(std::string &str){
-	std::string out = "";
-	if(!consume(str,"?")) return NULL;
+namespace cxx_demangler
+{
+	/* MangledName:
+		'?' BasicName Qualification '@' QualifiedTypeCode StorageClass
+		'?' BasicName '@' UnqualifiedTypeCode StorageClass
+	*/
+	std::string parseMangledName(std::string &str){
+		std::string out = "";
+		if(!consume(str,"?")) return NULL;
 
-	std::string scope;
+		std::string scope;
 
-	basicName bN;
-	unqualifiedTypeCode uTC;
-	storageClass sC;
-	qualification q;
-	qualifiedTypeCode qTC;
-	
-	bN.parse(str);
-	
-	std::string bn = bN.toString();
+		basicName bN;
+		unqualifiedTypeCode uTC;
+		storageClass sC;
+		qualification q;
+		qualifiedTypeCode qTC;
+		
+		bN.parse(str);
+		
+		std::string bn = bN.toString();
 
-	if(consume(str,"@"))
-	{
-		//basicName, scope, unqualifiedtypecode, storageclass
-		scope = "global";
-		
-		uTC.parse(str);
-		
-		sC.parse(str);
-		
-		out = out
-		.append(sC.toString())
-		.append(" ")
-		.append(
-			uTC.toString
-			(
-				bn
+		if(consume(str,"@"))
+		{
+			//basicName, scope, unqualifiedtypecode, storageclass
+			scope = "global";
+			
+			uTC.parse(str);
+			
+			sC.parse(str);
+			
+			out = out
+			.append(sC.toString())
+			.append(" ")
+			.append(
+				uTC.toString
+				(
+					bn
+				)
 			)
-		)
-		.append(";")
-		;
-	}
-	else
-	{
-		//basicName, scope, qualification, qualifiedtypecode, storageclass
-		scope = "public:";
-		q.parse(str);
-		consume(str,"@");
-		qTC.parse(str);
+			.append(";")
+			;
+		}
+		else
+		{
+			//basicName, scope, qualification, qualifiedtypecode, storageclass
+			scope = "public:";
+			q.parse(str);
+			consume(str,"@");
+			qTC.parse(str);
 
-		if(qTC.isData) scope = "public: static";
-		
-		sC.parse(str);
-		
-		if(str_match(bn,"\\q")) bn = q.contents[0];
-		else if(str_match(bn,"~\\q")) bn = std::string("~").append(q.contents[0]);
-		
-		out = out
-		.append(scope)
-		.append(" ")
-		.append(sC.toString())
-		.append(" ")
-		.append(
-			qTC.toString
-			(
-				q.toString().append("::").append(bn)
+			if(qTC.isData) scope = "public: static";
+			
+			sC.parse(str);
+			
+			if(str_match(bn,"\\q")) bn = q.contents[0];
+			else if(str_match(bn,"~\\q")) bn = std::string("~").append(q.contents[0]);
+			
+			out = out
+			.append(scope)
+			.append(" ")
+			.append(sC.toString())
+			.append(" ")
+			.append(
+				qTC.toString
+				(
+					q.toString().append("::").append(bn)
+				)
 			)
-		)
-		.append(";")
-		;
+			.append(";")
+			;
+		}
+
+		global_backref.clear();
+
+		return rmws(trim(out));
 	}
 
-	global_backref.clear();
-
-	return rmws(trim(out));
-}
-
-std::string demangle(std::string str){
-	global_backref.clear();
-	std::string s = parseMangledName(str);
-	if(str.length() > 0) std::cout << "str remains: " << str << std::endl;
-	return s;
+	std::string demangle(std::string str){
+		global_backref.clear();
+		std::string s = parseMangledName(str);
+		if(str.length() > 0) std::cout << "str remains: " << str << std::endl;
+		return s;
+	}
 }
 
 int main(){
@@ -141,7 +150,7 @@ int main(){
 		"??1myclass@@QAE@XZ",
 		"??1nested@@QAE@XZ",
 		"??0myclass@@QAE@H@Z",
- 		"??Emyclass@@QAE?AV0@XZ",
+		"??Emyclass@@QAE?AV0@XZ",
 		"??Hmyclass@@QAE?AV0@H@Z",
 		"??Emyclass@@QAE?AV0@H@Z",
 		"?Fi_i@myclass@@QAEHH@Z",
@@ -157,7 +166,7 @@ int main(){
 		"?Fv_Ci@@YA?BHXZ",
 		"?Fis_i@myclass@@SAHH@Z",
 		"?m@C@@SAPAV1@XZ",
- 		"?Fv_Ri@@YAAAHXZ",
+		"?Fv_Ri@@YAAAHXZ",
 		"?Fv_PPv@@YAPAPAXXZ",
 		"?FPi_i@@YAHPAH@Z",
 		"?myarray@@3PAHA",
@@ -180,9 +189,8 @@ int main(){
 	{
 		if(args[i][0]=='Z') break; //debugging stop-code; nothing ever begins with "Z"
 		std::cout << "I:\t" << args[i] << std::endl;
-		std::string result = demangle(args[i]);
+		std::string result = cxx_demangler::demangle(args[i]);
 		std::cout << "O:\t" << result << std::endl << std::endl;
 	}
 	return 0;
 }
-
