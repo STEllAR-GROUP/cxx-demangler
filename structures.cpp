@@ -5,7 +5,7 @@
 */
 
 namespace cxx_demangler
-{
+{	
 	/* StorageClass:
 		'A' (Normal Storage)
 		'B' (Volatile Storage)
@@ -14,18 +14,69 @@ namespace cxx_demangler
 	*/
 	struct storageClass{
 		std::string sClass;
+		std::string postfix;
+		
 		int display;
 		storageClass(){}
+
+		void checkPrefix(std::string &str)
+		{
+			std::string postfix;
+
+			if(consume(str,"E")) //__ptr64
+			{
+				this->postfix = " __ptr64";
+			}
+		else	if(consume(str,"F")) //__unaligned
+			{
+				this->postfix = " __unaligned";
+			}
+		else	if(consume(str,"I")) //__restrict
+			{
+				this->postfix = " __restrict";
+			}
+			this->getNextStorageClass(str);
+		}
+		void getNextStorageClass(std::string &str)
+		{
+			std::string out = "";
+			std::string options[100][2] =
+			{
+				{"A",	"normal"},
+				{"B",	"const"},
+				{"C",	"volatile"},
+				{"D",	"const volatile"},
+				{"Z",	"executable"},
+				{"",""}
+			};
+			int i = 0;
+			while(options[i][0].length()>0)
+			{
+				if(str[0]=='A'||str[0]=='Z') this->display = 0;
+				else this->display = 1;	
+				if(consume(str,options[i][0]))
+				{
+					this->sClass = options[i][1];
+					return;
+				}
+				i++;
+			}
+			checkPrefix(str);
+		}
 		void parse(std::string &str)
 		{
-			if(str[0]=='A'||str[0]=='Z') this->display = 0;
-			else this->display = 1;	
-			this->sClass = getNextStorageClass(str);
+			this->display = 1;
+if(DO_DEBUG)		debug("parsing next storage class...\t",str);
+			this->getNextStorageClass(str);
 		}
 		std::string toString()
 		{
 			if(display==1) return this->sClass;
 			else return "";
+		}
+		std::string getPostfix()
+		{
+			return this->postfix;
 		}
 	};
 
@@ -49,16 +100,75 @@ namespace cxx_demangler
 		void           X (terminates argument list)
 		elipsis        Z (terminates argument list)
 	*/
+	/* Consider this:
+		- getnextdatatype.  do not checkexceptions in that method.
+		- check exceptions in this method.  take note of the special exceptions.
+		- in the case of something like a "Q" datatype in an arglist, you may then add the "const" after processing and checking exceptions.
+	 */
 	struct dataTypeCode{
 		std::string contents;
-		dataTypeCode(){}
+		std::string pointerStorageClass;
+		
+		std::string exceptionCode;
+		
+		int isPointer;
+		functionTypeCode fTC;
+		dataTypeCode(){}		
 		void parse(std::string &str)
 		{
-			this->contents = getNextDataType(str);
+			this->isPointer = 0;
+			std::string dt = getNextDataType(str);
+			this->exceptionCode = dt;
+			std::string ce = checkExceptions(dt,str);
+			dt = ce;
+			this->contents = dt;
+			if(str_match(dt,"P6"))
+			{
+				this->isPointer = 1;
+				this->fTC.parse(str);
+				consume(str,"@");
+				storageClass sC;
+				sC.parse(str);
+				this->pointerStorageClass = sC.toString();
+			}
 		}
-		std::string toString()
+		std::string toString(std::string sC,std::string name)
 		{
-			return this->contents;
+			if(this->isPointer)
+			{
+				std::string out = this->fTC.returnValueTypeCode
+				.append(" (")
+				.append(this->fTC.cConvention)
+				.append("*")
+				.append(this->pointerStorageClass);
+				
+				if(name.length()>0)
+				out = out
+				.append(" ")
+				.append(name);
+				
+				out = out
+				.append(")(")
+				.append(this->fTC.argList)
+				.append(")")
+				;
+				return rmws(out);
+			}
+			else
+			{
+				std::string out = this->contents;
+				if(sC.length()>0) out = out.append(" ").append(sC);
+				if(name.length()>0) out = out.append(" ").append(name);
+				return rmws(out);
+			}
+		}
+		std::string toGCC()
+		{
+			std::string out;
+			if(this->isPointer) out = out.append("P");
+			out = out.append(contents);
+			
+			return out;
 		}
 	};
 
@@ -67,31 +177,38 @@ namespace cxx_demangler
 	If the parameter list is not void and does not end in elipsis,
 	its encoding is terminated by an @. 
 	*/
-	struct argumentList{
-		std::vector<std::string> args;	
-		std::vector<std::string> local_backref;
-		argumentList(){}
-		void parse(std::string &str)
+		argumentList::argumentList(){}
+		void argumentList::parse(std::string &str)
 		{
 			local_backref.clear();
 			while(1)
-			{
+			{	
+				if(consume(str,"@")) break;
+				
 				dataTypeCode dTC;
 				dTC.parse(str);
-				std::string add = dTC.toString();
-				if(str_match(add,"Z"))
+								
+				std::string add = dTC.toString("","");//hack
+				
+		if(DO_DEBUG)	debug("arglist parsed:\t",add);
+				//std::cout << GCC_MANGLE << "\n";
+				
+				if(str_match(dTC.exceptionCode,"Q"))
 				{
-					args.push_back("..."); //Is this acceptable?
+					add = add.append(" ").append("const");
+				}
+				
+				if(str_match(add,"Z")||str_match(add,"z"))
+				{
+					std::string one = "1";
+					if(GCC_MANGLE && DO_DEBUG) debug("Z\t",one);
+					args.push_back(std::string("...")); //Is this acceptable?
 					break;
 				}
-				else if (str_match(add,"@"))
-				{
-					break;
-				}
-				else if(str_match(add,"void"))
+				else if(str_match(add,"void")||str_match(add,"v"))
 				{
 					args.push_back(add);
-					return;
+					break;
 				}
 				else
 				{
@@ -107,13 +224,18 @@ namespace cxx_demangler
 				}
 			}
 		}
-		std::string toString()
+		std::string argumentList::toString()
 		{
 			std::string out;
 			out = implode(",",this->args);
 			return out;
 		}
-	};
+		std::string argumentList::toGCC()
+		{
+			std::string out;
+			out = implode("",this->args);
+			return out;
+		}
 
 	/* Function Calling Convention Codes
 
@@ -133,91 +255,113 @@ namespace cxx_demangler
 			return this->cConvention;
 		}
 	};
-
+	
 	/* FunctionTypeCode:
 		CallingConvention ReturnValueTypeCode ArgumentList
 	*/
-	struct functionTypeCode{
-		std::string
-			cConvention,
-			returnValueTypeCode,
-			argList;
-		functionTypeCode(){}
-		void parse(std::string &str)
+		functionTypeCode::functionTypeCode(){}
+		void functionTypeCode::parse(std::string &str)
 		{
+if(DO_DEBUG)		debug("parsing calling convention.\t",str);
 			callingConvention cC;
 			cC.parse(str);
 			this->cConvention = cC.toString();
 			
+if(DO_DEBUG)		debug("parsing return value type code.\t",str);
 			dataTypeCode rVTC;
 			rVTC.parse(str);
-			this->returnValueTypeCode = rVTC.toString();
+			this->returnValueTypeCode = rVTC.toString("","");//hack
+
+if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			argumentList aL;
 			aL.parse(str);
 			this->argList = aL.toString();
+			this->aL_gcc = aL.toGCC();
 		}
-		std::string toString(std::string name)
+		std::string functionTypeCode::toString(std::string name)
 		{
 			std::string out = "";
 			return out
-			.append(returnValueTypeCode)
+			.append(this->returnValueTypeCode)
 			.append(" ")
-			.append(cConvention)
+			.append(this->cConvention)
 			.append(" ")
 			.append(name)
 			.append("(")
-			.append(argList)
+			.append(this->argList)
 			.append(")")
+//			.append(this->postfix)
 			;
 		}
-	};
+		std::string functionTypeCode::toGCC()
+		{
+			return this->aL_gcc;
+		}
 
 	struct functionTypeCode2{
 		std::string
 			container,
 			cConvention,
 			returnValueTypeCode,
-			argList;
+			argList,
+			postfix,
+			aL_gcc
+			;
+		storageClass sC;
+		
 		functionTypeCode2(){}
 		void parse(std::string &str)
 		{
-			storageClass sC;
 			sC.parse(str);
 			this->container = sC.toString();
+			this->postfix = sC.getPostfix();
+			
 			callingConvention cC;
 			cC.parse(str);
 			this->cConvention = cC.toString();
 
-			if(consume(str,"@")) this->returnValueTypeCode = "";
+			if(consume(str,"@")) this->returnValueTypeCode = ""; /* Maybe this is the convention of a different type of function code with its own rules.
+										Please modify the code accordingly. */
 			else
 			{
 				dataTypeCode rVTC;
 				rVTC.parse(str);
-				this->returnValueTypeCode = rVTC.toString();
+				this->returnValueTypeCode = rVTC.toString("","");//hack
 			}
 			argumentList aL;
 			aL.parse(str);
 			this->argList = aL.toString();
+			this->aL_gcc = aL.toGCC();
 		}
 		std::string toString(std::string name)
 		{
 			std::string out = "";
 			return out
 			.append(" ")
-			.append(container)
+			.append(this->returnValueTypeCode)
 			.append(" ")
-			.append(returnValueTypeCode)
-			.append(" ")
-			.append(cConvention)
+			.append(this->cConvention)
 			.append(" ")
 			.append(name)
 			.append("(")
-			.append(argList)
+			.append(this->argList)
 			.append(")")
+			.append(sC.toString())
+			.append(" ")
+			.append(this->postfix)
 			;
 		}
+		std::string toGCC()
+		{
+			return this->aL_gcc;
+		}
+
 	};
 
+	//Please unify _nqualifiedTypeCode and _ualifiedTypeCode into a single struct when convenient.
+	struct typeCode{
+	};
+	
 	/* UnqualifiedTypeCode:
 		'Y' FunctionTypeCode
 		'3' DataTypeCode
@@ -225,8 +369,7 @@ namespace cxx_demangler
 	struct unqualifiedTypeCode{
 		std::string
 			funcType,
-			dataType,
-			staticTypeCode;
+			dataType;
 		int
 			isFunction,
 			isData,
@@ -234,10 +377,13 @@ namespace cxx_demangler
 		
 		functionTypeCode fTypeCode;
 		functionTypeCode sTypeCode;
+		dataTypeCode dTypeCode;
 		
 		unqualifiedTypeCode(){}
 		void parse(std::string &str)
 		{
+if (DO_DEBUG)		debug("unqualifiedTypeCode...",str);
+
 			this->isFunction = this->isData = this->isStatic = 0;
 			if(consume(str,"Y")) //FunctionTypeCode
 			{
@@ -246,22 +392,30 @@ namespace cxx_demangler
 			}
 			else if(consume(str,"3")) //DataTypeCode
 			{
-				dataTypeCode dTC;
-				dTC.parse(str);
-				this->dataType = dTC.toString();
+				this->dTypeCode.parse(str);
 				this->isData = 1;
 			}
-			else if(consume(str,"S")) //static -- please review/check for rules, if any
+			else if(consume(str,"S")||consume(str,"C")) //static -- please review/check for rules, if any
 			{
 				this->sTypeCode.parse(str);
 				this->isStatic = 1;
 			}
+			else if(consume(str,"6")) //static -- please review/check for rules, if any
+			{
+				return;
+			}
 		}
-		std::string toString(std::string name)
+		std::string toString(std::string name,std::string sC)
 		{
 			if(this->isFunction) return this->fTypeCode.toString(name);
-		else	if(this->isData) return this->dataType.append(" ").append(name);
+		else	if(this->isData) return this->dTypeCode.toString(sC,name);//are these valid?  the storageclass may be different...
 		else	if(this->isStatic) return this->sTypeCode.toString(name);
+		}
+		std::string toGCC()
+		{
+			if(this->isFunction) return this->fTypeCode.toGCC();
+		else	if(this->isData) return "";//this->dTypeCode.toGCC();//are these valid?  the storageclass may be different...
+		else	if(this->isStatic) return this->sTypeCode.toGCC();
 		}
 	};
 
@@ -273,46 +427,87 @@ namespace cxx_demangler
 		std::string
 			fTypeCode,
 			dataType,
-			staticTypeCode;
+			modifier;
 		int
 			isFunction,
 			isData,
-			isStatic;
+			isStatic,
+			isVirtual;
 		functionTypeCode2 fTypeCode2;
 		functionTypeCode sTypeCode;
+		dataTypeCode dTypeCode;
 		
 		qualifiedTypeCode(){}
 		void parse(std::string &str)
 		{
-			this->isFunction = this->isData = this->isStatic = 0;
+			this->isFunction = this->isData = this->isStatic = this->isVirtual = 0;
 			if(consume(str,"Q"))
 			{
 				this->isFunction = 1;
 				this->fTypeCode2.parse(str);
+				this->modifier = "public: ";
 			}
-			else if(consume(str,"2"))
+			else if(consume(str,"2")) /* Please try to fully understand the calling conventions at work here */
 			{
 				this->isData = 1;
-				dataTypeCode dTC;
-				dTC.parse(str);
-				this->dataType = dTC.toString();
+				this->dTypeCode.parse(str);
+				this->modifier = "public: static ";
 			}
-			else if(consume(str,"S")) //static -- please review/check for rules, if any
+			else if(consume(str,"4") || consume(str,"3")) /* Please try to fully understand the calling conventions at work here */
 			{
+				this->isData = 1;
+				this->dTypeCode.parse(str);
+			}
+			else if(consume(str,"S")||consume(str,"C")) //static -- please review/check for rules, if any
+			{
+				this->modifier = "public: static";
 				this->isStatic = 1;
-				sTypeCode.parse(str);
+				this->sTypeCode.parse(str);
 			}
 			else if(consume(str,"Y")) //complex
 			{
 				this->isStatic = 1;
 				sTypeCode.parse(str);
 			}
+			else if(consume(str,"I")) //complex
+			{
+				this->isFunction = 1;
+				this->modifier = "protected:";
+				fTypeCode2.parse(str);
+			}
+			else if(consume(str,"U")) //virtual
+			{
+				this->isVirtual = 1;
+				this->fTypeCode2.parse(str);
+				this->modifier = "public: virtual ";
+			}
+			else if(consume(str,"6")) //as in "6B"
+			{
+				return;
+			}
 		}
-		std::string toString(std::string name)
-		{
+		std::string toString(std::string name,std::string sC)
+		{			
 			if(this->isFunction) return this->fTypeCode2.toString(name);
-		else	if(this->isData) return this->dataType.append(" ").append(name);
-		else	if(this->isStatic) return this->sTypeCode.toString(name);
+		else	if(this->isVirtual) return this->fTypeCode2.toString(name);
+		else	if(this->isData) return this->dTypeCode.toString(sC,name);
+		else	if(this->isStatic)
+			{
+				return this->sTypeCode.toString(name);
+			}
+		else	return sC.append(" ").append(name);
+		}
+		std::string toGCC()
+		{
+			if(this->isFunction) return this->fTypeCode2.toGCC();
+		else	if(this->isVirtual) return this->fTypeCode2.toGCC();
+		else	if(this->isData) return "";//this->dTypeCode.toGCC();
+		else	if(this->isStatic) return this->sTypeCode.toGCC();
+		else	return "";
+		}
+		std::string getModifier()
+		{
+			return this->modifier;
 		}
 	};
 
@@ -332,15 +527,11 @@ namespace cxx_demangler
 		'?' operatorCode
 		string '@
 	*/
-	struct basicName{
-			int hasOperator;
-			int hasTemplate;
-			std::string operatorCode;
-			std::string nameFragment;
-			std::string templateStr;
-			basicName(){}
-			void parse(std::string &str)
+			basicName::basicName(){}
+			void basicName::parse(std::string &str)
 			{
+if (DO_DEBUG)			std::cout << "Parsing basic name.\n";
+				
 				this->hasOperator = 0;
 				this->hasTemplate = 0;
 				this->nameFragment = "";
@@ -348,10 +539,20 @@ namespace cxx_demangler
 				
 				if(consume(str,"?$")) //Template
 				{
-					templateArg t;
-					t.parse(str);
+					templateArg tA;
+					tA.parse(str);
 					this->hasTemplate = 1;
-					this->templateStr = t.toString();
+					this->templateStr = tA.toString();
+					this->gcc_template = tA.toGCC();
+					
+					return;
+				}
+				else if(consume(str,"??")) //Nested Name
+				{
+					str = std::string("?").append(str);
+					std::string dm = parseMangledName(str);
+					//consume(str,"@");
+					this->nameFragment = std::string("`").append(dm).append("'");
 					return;
 				}
 				else if(consume(str,"?")) //Operator
@@ -359,20 +560,35 @@ namespace cxx_demangler
 					char i = str[0];
 					this->operatorCode = getNextOpCode(str);
 					
-					if(i=='0'||i=='1') this->operatorCode = this->operatorCode.append("\\q");
-
+					if
+					(
+						(!GCC_MANGLE) &&
+						(i=='0'||i=='1')
+					) this->operatorCode = this->operatorCode.append("\\q");
 					this->hasOperator = 1;
 					return;
 				}
 				else //Name fragment
 				{
+//					debug("parsing name fragment:",str);
 					char c = consume1(str);
 
 					int index = (int) (c-'0');
 					if(index >= 0 && index <= 9 && this->nameFragment.length()==0)
 					{
 						std::vector<std::string> gbr = getGlobalBackRef();
-						this->nameFragment = gbr[index];
+						
+					if	(index>(gbr.size()-1)) this->nameFragment = std::string("[backref]");
+					else	
+						{							
+							this->nameFragment = gbr[index];
+
+							std::stringstream len;
+							len << this->nameFragment.length();
+							std::string length = len.str();
+							
+							if(GCC_MANGLE) this->nameFragment = length.append(this->nameFragment);
+						}
 						return;
 					}
 
@@ -381,16 +597,79 @@ namespace cxx_demangler
 						this->nameFragment += c;
 						c = consume1(str);
 					}
+if (DO_DEBUG)				debug("name-fragment end:",str);
 					global_backref.insert(global_backref.end(),this->nameFragment);
+					
+					std::stringstream len;
+					len << this->nameFragment.length();
+					std::string length = len.str();
+					
+					if(GCC_MANGLE) this->nameFragment = length.append(this->nameFragment);
 					return;
 				}
 			}
-			std::string toString()
+			std::string basicName::toString()
 			{
 				if(this->hasOperator) return this->operatorCode;
 				else if(this->hasTemplate) return this->templateStr;
 				else return this->nameFragment;
 			}
+			std::string basicName::toGCC()
+			{
+				if(this->hasOperator) return this->operatorCode;
+				else if(this->hasTemplate) return this->gcc_template;
+				else return this->nameFragment;
+			}
+	
+	/* Qualification:
+		( string '@' )* 
+	*/
+	struct qualification{
+		std::vector<std::string> contents;
+		std::vector<basicName> bN_contents;
+		
+		qualification(){}
+		void parse(std::string &str)
+		{
+if (DO_DEBUG)		std::cout << "Parsing qualification.\n";
+			while(str[0]!='@')
+			{
+				if(isdigit(str[0]))
+				{
+					char c = consume1(str);
+					int index = c-'0';
+					std::vector<std::string> gbr = getGlobalBackRef();
+
+				if	(index>(gbr.size()-1)) this->contents.push_back("[backref]");
+				else	this->contents.push_back(gbr[index]);
+				
+				continue;
+				}
+				
+				basicName bN;
+				bN.parse(str);
+				std::string add = bN.toString();
+				this->contents.insert(this->contents.end(),add);
+				this->bN_contents.push_back(bN);
+			}
+if (DO_DEBUG)		debug("qualification end.\t",str);
+			//if(was_numeric) consume(str,"@");
+		}
+		std::string toString()
+		{
+			std::reverse(this->contents.begin(),this->contents.end());
+			return implode("::",this->contents);
+		}
+		std::string toGCC()
+		{
+			std::reverse(this->bN_contents.begin(),this->bN_contents.end());
+			std::string out = "";
+			for(int i = 0; i < bN_contents.size(); i++)
+			{
+				out = out.append(bN_contents[i].toGCC());
+			}
+			return out;
+		}
 	};
 	
 	/* Name with Template Arguments
@@ -399,45 +678,32 @@ namespace cxx_demangler
 		    Prefix ?$
 		    Name terminated by @
 		    Template argument list
-
-		For example, we assume the following prototype.
 	*/
 		templateArg::templateArg(){}
 		void templateArg::parse(std::string &str)
 		{
-			basicName bN;
-			bN.parse(str);
-			this->name = bN.toString();
+if (DO_DEBUG)		debug("template-begin:\t",str);
+			this->bN.parse(str);
+			this->name = this->bN.toString();
 			
-			argumentList aL;
-			aL.parse(str);
-			this->arguments = aL.toString();
+			this->aL.parse(str);
+			this->arguments = this->aL.toString();
+			
+			//qualification q;
+			//q.parse(str);
+			//consume(str,"@");
+			
+			//this->qualificn = q.toString();
+			
+			//consume(str,"@");
+if (DO_DEBUG)		debug("template-end:\t",str);																																																														
 		}
 		std::string templateArg::toString()
 		{
 			return this->name.append("<").append(this->arguments).append(">");
 		}
-
-	/* Qualification:
-		( string '@' )* 
-	*/
-	struct qualification{
-		std::vector<std::string> contents;
-		qualification(){}
-		void parse(std::string &str)
+		std::string templateArg::toGCC()
 		{
-			while(str[0]!='@')
-			{
-				basicName bN;
-				bN.parse(str);
-				std::string add = bN.toString();
-				this->contents.insert(this->contents.end(),add);
-			}
+			return this->name.append("I").append(this->aL.toGCC()).append("E");
 		}
-		std::string toString()
-		{
-			std::reverse(this->contents.begin(),this->contents.end());
-			return implode("::",this->contents);
-		}
-	};
 }

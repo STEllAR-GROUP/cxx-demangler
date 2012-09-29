@@ -7,6 +7,9 @@
 namespace cxx_demangler
 {
 	std::vector<std::string> global_backref;
+	int DO_DEBUG = 0;
+	int GCC_MANGLE = 0;
+	
 	std::vector<std::string> getGlobalBackRef(){
 		return global_backref;
 	}
@@ -22,6 +25,7 @@ namespace cxx_demangler
 	int consume(std::string &s,std::string ss);
 	std::string implode(std::string,std::vector<std::string>);
 	std::string parseQualification(std::string &str);
+	void debug(std::string a, std::string &b);
 
 	/*
 	* datatypes headers
@@ -33,7 +37,8 @@ namespace cxx_demangler
 	std::string getNextCallingConvention(std::string &s);
 	std::string checkExceptions(std::string s, std::string &str);
 	std::string getNextStorageClass(std::string &s);
-
+	std::string checkPrefix(std::string &str);
+	
 	/*
 	* main headers
 	*/
@@ -42,15 +47,57 @@ namespace cxx_demangler
 	std::string parseReturnValueTypeCode(std::string &s);
 	std::string parseArgumentList(std::string &s);
 	std::string parseBasicName(std::string &s);
+	std::string parseMangledName(std::string &s);
+	
+	/*
+	* Struct prototypes
+	*/
+	struct basicName{
+		int hasOperator;
+		int hasTemplate;
+		std::string operatorCode;
+		std::string nameFragment;
+		std::string templateStr;
+		std::string gcc_template;
+		basicName();
+		void parse(std::string &str);
+		std::string toString();
+		std::string toGCC();
+	};
+
+	struct argumentList{
+		std::vector<std::string> args;	
+		std::vector<std::string> local_backref;
+		argumentList();
+		void parse(std::string &str);
+		std::string toString();
+		std::string toGCC();
+	};
 
 	struct templateArg{
 		std::string name;
 		std::string arguments;
+		std::string qualificn;
+		argumentList aL;
+		basicName bN;
+
 		templateArg();
 		void parse(std::string &str);
 		std::string toString();
+		std::string toGCC();
 	};
-
+	
+	struct functionTypeCode{
+		std::string
+			cConvention,
+			returnValueTypeCode,
+			argList,
+			aL_gcc;		
+		functionTypeCode();
+		void parse(std::string &str);
+		std::string toString(std::string name);
+		std::string toGCC();
+	};
 
 	int main();
 }

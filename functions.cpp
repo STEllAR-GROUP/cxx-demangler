@@ -23,17 +23,27 @@ namespace cxx_demangler
 	}
 
 	char consume1(std::string &s){
+		if(s.length()==0) return '\0';
+		
 		char out = s[0];
-		s = s.substr(1,s.length()-1);
+		s.erase(0,1);
+
+if (DO_DEBUG)	std::cout<<"consume1:"<<out<<std::endl;
+
 		return out;
 	}
 	int consume(std::string &s, std::string ss){
+		if(s.length()==0) return 0;
+		
 		for(int i = 0; i < ss.length(); i++)
 		{
 			if(i >= s.length()) return 0;
 			if(s[i] != ss[i]) return 0;
 		}
-		s = s.substr(ss.length(),s.length()-ss.length());
+		
+if (DO_DEBUG)	debug("consume:",ss);
+		
+		s.erase(0,ss.length());
 		return 1;
 	}
 
@@ -48,7 +58,10 @@ namespace cxx_demangler
 	}
 
 	int str_match(std::string a, std::string b){
-		if(a.compare(b)==0) return 1;
+		if(a.compare(b)==0)
+		{
+			return 1;
+		}
 		else return 0;
 	}
 
@@ -85,5 +98,32 @@ namespace cxx_demangler
 			else out+=str[i];
 		}
 		return out;
+	}
+	void debug(std::string a, std::string &b)
+	{
+		std::cout << "\n" << a << b << "\n\n";
+	}
+	std::string read_line()
+	{
+		std::string s;
+		char c;
+		scanf("%c",&c);
+		if(c=='\n') scanf("%c",&c);
+		
+		while(c!='\n')
+		{
+			s = s.append(1,c);
+			scanf("%c",&c);
+		}
+		return s;
+	}
+	int eq(std::string a, std::string b)
+	{
+		//if(a.length()!=b.length()) return 0;
+		for(int i = 0; i < b.length(); i++)
+		{
+			if(a[i]!=b[i]) return 0;
+		}
+		return 1;
 	}
 }
