@@ -89,10 +89,21 @@ namespace cxx_demangler
 			q.parse(str);
 			consume(str,"@");
 									
-			return std::string("struct ")
-			.append(q.toString())
-			.append("::")
-			.append(bN.toString());
+			//return std::string("struct ").append(q.toString()).append("::").append(bN.toString());
+			
+			std::string out;
+			
+			if(q.toString().length()>0 && !GCC_MANGLE)
+				out = std::string("struct ")
+				.append(q.toString())
+				.append("::")
+				.append(bN.toString());
+				
+			else if(!GCC_MANGLE) out = std::string("struct ").append(bN.toGCC());
+			else if(GCC_MANGLE && q.toString().length()>0) out = std::string("NS0_").append(q.toGCC()).append(bN.toGCC()).append("E");
+			else if(GCC_MANGLE) out = std::string("NS0_").append(bN.toGCC()).append("E");
+			
+			return out;
 		}
 	else	if(str_match(s,"*")) //Pointer
 		{
@@ -100,13 +111,14 @@ namespace cxx_demangler
 			std::string check = checkExceptions(type,str);
 			type = check;
 			
-			return type
-			.append(" *");
+			if(!GCC_MANGLE) return type.append(" *");
+			else return std::string("P").append(type);
 		}
 	else	if(str_match(s,"V")) //Class
 		{			
 			basicName bN;
 			bN.parse(str);
+			
 			std::string basicName = checkExceptions(bN.toString(),str);
 			
 			qualification q;
@@ -122,11 +134,15 @@ namespace cxx_demangler
 				//basicName = gbr[index];
 				basicName = "[backref]";
 			}
-			if(qualn.length()>0) return std::string("class ").append(qualn).append("::").append(basicName);
-		else	if(!GCC_MANGLE) return std::string("class ").append(basicName);
 			
-			if(qualn.length()>0) return std::string("N").append(q.toGCC()).append(bN.toGCC()).append("E");
-			else return std::string("N").append(bN.toGCC()).append("E");
+			std::string out;
+			
+			if(qualn.length()>0 && !GCC_MANGLE) out = std::string("class ").append(qualn).append("::").append(basicName);
+			else if(!GCC_MANGLE) out = std::string("class ").append(basicName);		
+			else if(GCC_MANGLE && qualn.length()>0) out = std::string("NS0_").append(q.toGCC()).append(bN.toGCC()).append("E");
+			else if(GCC_MANGLE) out = std::string("NS0_").append(bN.toGCC()).append("E");
+			
+			return out;
 		}
 	else	if(str_match(s,"Q")) //Array
 		{
@@ -147,12 +163,16 @@ namespace cxx_demangler
 			
 			//I think this has to have another "const" added (at the end? verify) if passed as an argument.
 			
-			return rVTC.toString("","")//hack
-			.append(" ")
-			.append(sC.toString())
-			.append(" * ")
-			.append(sC.postfix)
-			;
+			if(!GCC_MANGLE)
+			{
+				return rVTC.toString("","")//hack
+				.append(" ")
+				.append(sC.toString())
+				.append(" * ")
+				.append(sC.postfix)
+				;
+			}
+			else return std::string("P").append(rVTC.toString("",""));
 		}
 	else	if(str_match(s,"?")) //Modifier
 		{
@@ -178,10 +198,14 @@ namespace cxx_demangler
 			std::string qualification = q.toString();
 			consume(str,"@");
 			
-			return out
-			.append(" ")
-			.append(qualification)
-			;
+			if(!GCC_MANGLE)
+			{
+				return out
+				.append(" ")
+				.append(qualification)
+				;
+			}
+			else return "NS0_1EE";
 		}
 	else	if(str_match(s,"&")) //Reference
 		{
@@ -201,8 +225,7 @@ namespace cxx_demangler
 				.append(" ")
 				.append(sC.postfix);
 				
-			if(GCC_MANGLE) out = std::string("R").append(rVTC.toGCC());
-				
+			if(GCC_MANGLE) out = std::string("R").append(sC.toGCC()).append(rVTC.toGCC());
 				return out;
 		}
 	else	return s;
@@ -276,7 +299,7 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 			{"P",	 "P",	"P"},
 			{"Q",	 "Q",	"Q"},
 			{"S",	 "???",	"[Type modifier (const volatile pointer)]"},
-			{"U",	"???",	"U"},
+			{"U",	 "U",	"U"},
 			{"V",	 "V",	"V"},
 			{"W",	 "W",	"W"},
 			{"X",	 "v",	"void"},
@@ -304,11 +327,11 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 			{"_G",	"???",	"{_G}"},
 			{"_H",	"???",	"{_H}"},
 			{"_I",	"???",	"{_I}"},
-			{"_J",	"???",	"{_J}"},
-			{"_K",	"???",	"unsigned __int64"},
+			{"_J",	"x",	"__int64"},
+			{"_K",	"y",	"unsigned __int64"},
 			{"_L",	"???",	"{_L}"},
 			{"_M",	"???",	"{_M}"},
-			{"_N",	"???",	"bool"},
+			{"_N",	"b",	"bool"},
 			{"_O",	"???",	"{_O}"},
 			{"_P",	"???",	"{_P}"},
 			{"_Q",	"???",	"{_Q}"},
@@ -317,7 +340,7 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 			{"_T",	"???",	"{_T}"},
 			{"_U",	"???",	"{_U}"},
 			{"_V",	"???",	"{_V}"},
-			{"_W",	"???",	"{_W}"},
+			{"_W",	"w",	"wchar_t"},
 			{"_X",	"???",	"{_X}"},
 			{"_Y",	"???",	"{_Y}"},
 			{"_Z",	"???",	"{_Z}"},
@@ -631,16 +654,47 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 		return "operator^=";
 	}
 	else	if(consume(s,"_7")) return "`vftable'";
-	else	if(consume(s,"_B"))
-		{
-			return std::string("'local static guard'");
-		}
+	else	if(consume(s,"_8")) return "`vbtable'";
+	else	if(consume(s,"_9")) return "`vcall'";
+	else	if(consume(s,"_A")) return "`typeof'";
+	else	if(consume(s,"_B")) return std::string("`local static guard'");
+	else	if(consume(s,"_C")) return std::string("`string'");
+	else    if(consume(s,"_D")) return "`vbase destructor'";
+	else    if(consume(s,"_E")) return "`vector deleting destructor'";
 	else	if(consume(s,"_F")) return "`default constructor closure'";
-	
-	
+	else	if(consume(s,"_G")) return "`scalar deleting destructor'";
+	else	if(consume(s,"_H")) return "`vector constructor iterator'";
+	else	if(consume(s,"_I")) return "`vector destructor iterator'";
+	else	if(consume(s,"_J")) return "`vector vbase constructor iterator'";
+	else	if(consume(s,"_K")) return "`virtual displacement map'";
+	else	if(consume(s,"_L")) return "`eh vector constructor iterator'";
+	else	if(consume(s,"_M")) return "`eh vector destructor iterator'";
+	else	if(consume(s,"_N")) return "`eh vector vbase constructor iterator'";
+	else	if(consume(s,"_O")) return "`copy constructor closure'";
+	else	if(consume(s,"_P")) return "`udt returning'";
+	//else	if(consume(s,"_Q")) return "`'";
+	//else	if(consume(s,"_R")) return "`'"; //RTTI-related code
+	else	if(consume(s,"_S")) return "`local vftable'";
+	else	if(consume(s,"_T")) return "`local vftable constructor closure'";
+	else	if(consume(s,"_U"))
+	{
+		if(GCC_MANGLE) return "na";
+		return "operator new[]";
+	}
+	else	if(consume(s,"_V"))
+	{
+		if(GCC_MANGLE) return "da";
+		return "operator delete[]";
+	}	
+	else	if(consume(s,"_X")) return "`placement delete closure'";
+	else	if(consume(s,"_X")) return "`placement delete[] closure'";
+	else	if(consume(s,"__A")) return "`managed vector constructor iterator'";
+	else	if(consume(s,"__B")) return "`managed vector destructor iterator'";
+	else	if(consume(s,"__C")) return "`eh vector copy constructor iterator'";
+	else	if(consume(s,"__D")) return "`eh vector vbase copy constructor iterator'";
 	else	if(consume(s,"_") && consume1(s)) return "{_X}";	//Hack, please add real definitions
 	}
-
+	//{__X}
 	std::string getRealType(std::string &s)
 	{
 		if(consume(s,"0")) return "char";

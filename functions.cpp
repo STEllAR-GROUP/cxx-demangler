@@ -117,6 +117,15 @@ if (DO_DEBUG)	debug("consume:",ss);
 		}
 		return s;
 	}
+	std::string replace(std::string str, std::string from, std::string to) {
+		if(from.empty()) return str;
+		size_t start_pos = 0;
+		while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+			str.replace(start_pos, from.length(), to);
+			start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+		}
+		return str;
+	}
 	int eq(std::string a, std::string b)
 	{
 		//if(a.length()!=b.length()) return 0;

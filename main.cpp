@@ -78,7 +78,7 @@ if (DO_DEBUG)	debug("basicname:",bn);
 			.append(sC.getPostfix())
 			;
 			
-			if(GCC_MANGLE) out = bN.toGCC().append(uTC.toGCC());;
+			if(GCC_MANGLE) out = bN.toGCC().append(uTC.toGCC());
 		}
 		else
 		{
@@ -112,14 +112,15 @@ if (DO_DEBUG)		debug("parsing storage class:\t",str);
 				.append(sC.getPostfix())
 				;
 			}
-			if(GCC_MANGLE) out = std::string("N").append(q.toGCC()).append(bN.toGCC()).append("E").append(qTC.toGCC());
+			if(GCC_MANGLE && bN.hasOperator != 2) out = std::string("N").append(q.toGCC()).append(bN.toGCC()).append("E").append(qTC.toGCC());
+			else if(GCC_MANGLE) out = bN.toGCC().append(std::string("N")).append(q.toGCC()).append("E").append(qTC.toGCC());
 		}
 
 		global_backref.clear();
 if (DO_DEBUG)	std::cout << "mangled-name end\n\n";
-		out = rmws(trim(out));
+		out = replace(rmws(trim(out)),">>","> >");
 		
-		if(GCC_MANGLE) out = std::string("_Z").append(out);
+		if(GCC_MANGLE && !NESTED) out = std::string("_Z").append(out);
 		
 		return out;
 	}
@@ -143,8 +144,11 @@ if (DO_DEBUG)	std::cout << "mangled-name end\n\n";
 		}
 		
 		global_backref.clear();
+		
+		//std::cout << "here...\n";
 		std::string s = parseMangledName(str);
-
+		//std::cout << "done...\n";
+		
 		GCC_MANGLE = 0;
 		//std::cout << "gcc-mangle unset\t" << GCC_MANGLE << "\n";
 
@@ -160,14 +164,7 @@ if (DO_DEBUG)	std::cout << "mangled-name end\n\n";
 		}
 		
 		if(str.length() > 0) std::cout << "str remains: " << str << std::endl;
-		
-//if (DO_DEBUG)	s = s.append(";");
-
 		return s;
-	}
-	std::string gcc_remangle(std::string str)
-	{
-		return "_ZN9wikipedia7article6formatEv";
 	}
 }
 
@@ -175,8 +172,8 @@ int main(int argc, char** argv){
 	std::cout << "Enter Query." << std::endl;
 	int i = 1;
 	
-	int start = 0;
-	int stop = 128;
+	int start = 6;
+	int stop = 256;
 	
 	while(1)
 	{

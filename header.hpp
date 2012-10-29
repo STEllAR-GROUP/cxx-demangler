@@ -9,6 +9,7 @@ namespace cxx_demangler
 	std::vector<std::string> global_backref;
 	int DO_DEBUG = 0;
 	int GCC_MANGLE = 0;
+	int NESTED = 0;
 	
 	std::vector<std::string> getGlobalBackRef(){
 		return global_backref;
@@ -55,6 +56,7 @@ namespace cxx_demangler
 	struct basicName{
 		int hasOperator;
 		int hasTemplate;
+		int templateName;
 		std::string operatorCode;
 		std::string nameFragment;
 		std::string templateStr;
@@ -63,6 +65,7 @@ namespace cxx_demangler
 		void parse(std::string &str);
 		std::string toString();
 		std::string toGCC();
+		void build(std::string add);
 	};
 
 	struct argumentList{
@@ -77,6 +80,7 @@ namespace cxx_demangler
 	struct templateArg{
 		std::string name;
 		std::string arguments;
+		std::string gcc_arguments;
 		std::string qualificn;
 		argumentList aL;
 		basicName bN;
@@ -98,6 +102,18 @@ namespace cxx_demangler
 		std::string toString(std::string name);
 		std::string toGCC();
 	};
+	
+	struct qualification{
+		std::vector<std::string> contents;
+		std::vector<basicName> bN_contents;
+		int initial;
+		
+		qualification();
+		void parse(std::string &str);
+		std::string toString();
+		std::string toGCC();
+	};
+
 
 	int main();
 }
