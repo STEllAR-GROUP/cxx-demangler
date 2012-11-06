@@ -135,4 +135,21 @@ if (DO_DEBUG)	debug("consume:",ss);
 		}
 		return 1;
 	}
+	std::string i2s(int x)
+	{
+		std::stringstream ss;
+		ss << x;
+		std::string result = ss.str();
+		return result;
+	}
+	void list(std::vector<std::string> s)
+	{
+		std::cout << "[";
+		for(int i = 0; i < s.size(); i++)
+		{
+			std::cout << s[i];
+			if(i<s.size()-1) std::cout << ",";
+		}
+		std::cout << "]" << "\n";
+	}
 }

@@ -56,7 +56,7 @@ if (DO_DEBUG)	debug("parsing mangled name...\t",str);
 		qualification q;
 		qualifiedTypeCode qTC;
 
-		bN.parse(str);
+		bN.parse(str,global_backref);
 		std::string bn = bN.toString();
 if (DO_DEBUG)	debug("basicname:",bn);
 		
@@ -85,7 +85,7 @@ if (DO_DEBUG)	debug("basicname:",bn);
 			//basicName, scope, qualification, qualifiedtypecode, storageclass
 			//scope = "public:";
 
-			q.parse(str);
+			q.parse(str,global_backref);
 			consume(str,"@");
 			
 if (DO_DEBUG)		debug("parsing qtc:\t",str);
@@ -105,15 +105,15 @@ if (DO_DEBUG)		debug("parsing storage class:\t",str);
 				.append(
 					qTC.toString
 					(
-						q.toString().append("::").append(bn),
+						q.toString(global_backref).append("::").append(bn),
 						sC.toString()
 					)
 				)
 				.append(sC.getPostfix())
 				;
 			}
-			if(GCC_MANGLE && bN.hasOperator != 2) out = std::string("N").append(q.toGCC()).append(bN.toGCC()).append("E").append(qTC.toGCC());
-			else if(GCC_MANGLE) out = bN.toGCC().append(std::string("N")).append(q.toGCC()).append("E").append(qTC.toGCC());
+			if(GCC_MANGLE && bN.hasOperator != 2) out = std::string("N").append(q.toGCC(global_backref)).append(bN.toGCC()).append("E").append(qTC.toGCC());
+			else if(GCC_MANGLE) out = bN.toGCC().append(std::string("N")).append(q.toGCC(global_backref)).append("E").append(qTC.toGCC());
 		}
 
 		global_backref.clear();

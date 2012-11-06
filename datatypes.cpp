@@ -6,7 +6,7 @@
 
 namespace cxx_demangler
 {
-	std::string checkExceptions(std::string s,std::string &str)
+	std::string checkExceptions(std::string s,std::string &str,std::vector<std::string> &backref)
 	{
 		if(str_match(s,"P6")) //Function Pointer
 		{
@@ -18,10 +18,10 @@ namespace cxx_demangler
 			
 			std::string callingConvention = getNextCallingConvention(str);
 			dataTypeCode rVTC;
-			rVTC.parse(str);
+			rVTC.parse(str,backref);
 			std::string returnValueTypeCode = rVTC.toString("","");//hack
 			argumentList aL;
-			aL.parse(str);
+			aL.parse(str,backref);
 			std::string argList = aL.toString();
 			consume(str,"Z");
 			std::string n = "";
@@ -39,17 +39,17 @@ namespace cxx_demangler
 	else	if(str_match(s,"P8")) //Method Pointer?
 		{
 			basicName bN;
-			bN.parse(str);
+			bN.parse(str,backref);
 			qualification q;
-			q.parse(str);
+			q.parse(str,backref);
 			consume(str,"@");
 			
 			std::string callingConvention = getNextCallingConvention(str);
 			dataTypeCode rVTC;
-			rVTC.parse(str);
+			rVTC.parse(str,backref);
 			std::string returnValueTypeCode = rVTC.toString("","");//hack
 			argumentList aL;
-			aL.parse(str);
+			aL.parse(str,backref);
 			std::string argList = aL.toString();
 
 			storageClass c;
@@ -63,8 +63,8 @@ namespace cxx_demangler
 		{
 			storageClass sC;
 			sC.parse(str);
-			std::string dataType = getNextDataType(str);
-			std::string checked = checkExceptions(dataType,str);
+			std::string dataType = getNextDataType(str,backref);
+			std::string checked = checkExceptions(dataType,str,backref);
 			dataType = checked;
 			
 			if(GCC_MANGLE) return std::string("P").append(dataType);
@@ -83,32 +83,32 @@ namespace cxx_demangler
 	else	if(str_match(s,"U")) //struct
 		{
 			basicName bN;
-			bN.parse(str);
+			bN.parse(str,backref);
 			
 			qualification q;
-			q.parse(str);
+			q.parse(str,backref);
 			consume(str,"@");
 									
 			//return std::string("struct ").append(q.toString()).append("::").append(bN.toString());
 			
 			std::string out;
 			
-			if(q.toString().length()>0 && !GCC_MANGLE)
+			if(q.toString(backref).length()>0 && !GCC_MANGLE)
 				out = std::string("struct ")
-				.append(q.toString())
+				.append(q.toString(backref))
 				.append("::")
 				.append(bN.toString());
 				
-			else if(!GCC_MANGLE) out = std::string("struct ").append(bN.toGCC());
-			else if(GCC_MANGLE && q.toString().length()>0) out = std::string("NS0_").append(q.toGCC()).append(bN.toGCC()).append("E");
+			else if(!GCC_MANGLE) out = std::string("struct ").append(bN.toGCC()); //TODO: Qualification here?
+			else if(GCC_MANGLE && q.toString(backref).length()>0) out = std::string("NS0_").append(q.toGCC(backref)).append(bN.toGCC()).append("E");
 			else if(GCC_MANGLE) out = std::string("NS0_").append(bN.toGCC()).append("E");
 			
 			return out;
 		}
 	else	if(str_match(s,"*")) //Pointer
 		{
-			std::string type = getNextDataType(str);
-			std::string check = checkExceptions(type,str);
+			std::string type = getNextDataType(str,backref);
+			std::string check = checkExceptions(type,str,backref);
 			type = check;
 			
 			if(!GCC_MANGLE) return type.append(" *");
@@ -117,15 +117,15 @@ namespace cxx_demangler
 	else	if(str_match(s,"V")) //Class
 		{			
 			basicName bN;
-			bN.parse(str);
+			bN.parse(str,backref);
 			
-			std::string basicName = checkExceptions(bN.toString(),str);
+			std::string basicName = checkExceptions(bN.toString(),str,backref);
 			
 			qualification q;
-			q.parse(str);
+			q.parse(str,backref);
 			consume(str,"@");
 						
-			std::string qualn = q.toString();
+			std::string qualn = q.toString(backref);
 
 			if(hasNumericFirstChar(basicName))
 			{
@@ -139,7 +139,7 @@ namespace cxx_demangler
 			
 			if(qualn.length()>0 && !GCC_MANGLE) out = std::string("class ").append(qualn).append("::").append(basicName);
 			else if(!GCC_MANGLE) out = std::string("class ").append(basicName);		
-			else if(GCC_MANGLE && qualn.length()>0) out = std::string("NS0_").append(q.toGCC()).append(bN.toGCC()).append("E");
+			else if(GCC_MANGLE && qualn.length()>0) out = std::string("NS0_").append(q.toGCC(backref)).append(bN.toGCC()).append("E");
 			else if(GCC_MANGLE) out = std::string("NS0_").append(bN.toGCC()).append("E");
 			
 			return out;
@@ -159,7 +159,7 @@ namespace cxx_demangler
 			storageClass sC;
 			sC.parse(str);
 			dataTypeCode rVTC;
-			rVTC.parse(str);
+			rVTC.parse(str,backref);
 			
 			//I think this has to have another "const" added (at the end? verify) if passed as an argument.
 			
@@ -180,11 +180,11 @@ namespace cxx_demangler
 			sC.parse(str);
 			std::string attribute =  sC.toString();
 			
-			std::string type = getNextDataType(str);
-			std::string check = checkExceptions(type,str);
+			std::string type = getNextDataType(str,backref);
+			std::string check = checkExceptions(type,str,backref);
 			type = check;
 			
-			std::string dataType = checkExceptions(type,str);
+			std::string dataType = checkExceptions(type,str,backref);
 
 			return std::string("").append(dataType).append(" ").append(attribute);
 		}
@@ -194,8 +194,8 @@ namespace cxx_demangler
 			std::string type = getRealType(str);
 			
 			qualification q;
-			q.parse(str);
-			std::string qualification = q.toString();
+			q.parse(str,backref);
+			std::string qualification = q.toString(backref);
 			consume(str,"@");
 			
 			if(!GCC_MANGLE)
@@ -213,7 +213,7 @@ namespace cxx_demangler
 			sC.parse(str);
 			std::string sClass = sC.toString(); //Going by vc++filt's output conventions.  Or maybe it actually is callingConvention.
 			dataTypeCode rVTC;
-			rVTC.parse(str);
+			rVTC.parse(str,backref);
 			std::string returnValueTypeCode = rVTC.toString("","");//hack
 			std::string out =
 				returnValueTypeCode.append(" ")
@@ -231,7 +231,7 @@ namespace cxx_demangler
 	else	return s;
 	}
 
-	std::string getNextDataType(std::string &s)
+	std::string getNextDataType(std::string &s, std::vector<std::string> &backref)
 	{
 if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std::endl;
 		

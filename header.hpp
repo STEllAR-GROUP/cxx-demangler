@@ -31,12 +31,12 @@ namespace cxx_demangler
 	/*
 	* datatypes headers
 	*/
-	std::string getNextDataType(std::string &s);
+	std::string getNextDataType(std::string &s, std::vector<std::string> &backref);
 	std::string getNextOpCode(std::string &s);
 	std::string getNextContainer(std::string &s);
 	std::string getRealType(std::string &s);
 	std::string getNextCallingConvention(std::string &s);
-	std::string checkExceptions(std::string s, std::string &str);
+	std::string checkExceptions(std::string s, std::string &str, std::vector<std::string> &backref);
 	std::string getNextStorageClass(std::string &s);
 	std::string checkPrefix(std::string &str);
 	
@@ -62,7 +62,10 @@ namespace cxx_demangler
 		std::string templateStr;
 		std::string gcc_template;
 		basicName();
-		void parse(std::string &str);
+		void parse(std::string &str, std::vector<std::string> &backref);
+		
+		std::vector<std::string> local_backref;
+
 		std::string toString();
 		std::string toGCC();
 		void build(std::string add);
@@ -72,7 +75,7 @@ namespace cxx_demangler
 		std::vector<std::string> args;	
 		std::vector<std::string> local_backref;
 		argumentList();
-		void parse(std::string &str);
+		void parse(std::string &str, std::vector<std::string> &backref);
 		std::string toString();
 		std::string toGCC();
 	};
@@ -82,6 +85,8 @@ namespace cxx_demangler
 		std::string arguments;
 		std::string gcc_arguments;
 		std::string qualificn;
+		std::vector<std::string> local_backref;
+		
 		argumentList aL;
 		basicName bN;
 
@@ -106,14 +111,15 @@ namespace cxx_demangler
 	struct qualification{
 		std::vector<std::string> contents;
 		std::vector<basicName> bN_contents;
+		std::vector<std::string> local_backref;
 		int initial;
 		
 		qualification();
-		void parse(std::string &str);
-		std::string toString();
-		std::string toGCC();
+		void parse(std::string &str,std::vector<std::string> &backref);
+		std::string toString(std::vector<std::string> backref);
+		std::string toGCC(std::vector<std::string> backref);
+		std::string check(std::string, std::vector<std::string>);
 	};
-
-
+	
 	int main();
 }

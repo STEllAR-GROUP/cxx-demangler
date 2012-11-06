@@ -4,6 +4,8 @@
  * file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
+//Should we be passing global_backref around?  What about truly nested names?
+
 namespace cxx_demangler
 {	
 	/* StorageClass:
@@ -120,14 +122,13 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 		int isFPointer;
 		functionTypeCode fTC;
 		dataTypeCode(){}		
-		void parse(std::string &str)
+		void parse(std::string &str,std::vector<std::string> &backref)
 		{
-			this->isPointer = 0;
 			this->isFPointer = 0;
 			
-			std::string dt = getNextDataType(str);
+			std::string dt = getNextDataType(str,backref);
 			this->exceptionCode = dt;
-			std::string ce = checkExceptions(dt,str);
+			std::string ce = checkExceptions(dt,str,backref);
 			dt = ce;
 			this->contents = dt;
 			if(str_match(dt,"P6"))
@@ -193,7 +194,7 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 	its encoding is terminated by an @. 
 	*/
 		argumentList::argumentList(){}
-		void argumentList::parse(std::string &str)
+		void argumentList::parse(std::string &str,std::vector<std::string> &backref)
 		{
 			local_backref.clear();
 			while(1)
@@ -201,7 +202,7 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 				if(consume(str,"@")) break;
 				
 				dataTypeCode dTC;
-				dTC.parse(str);
+				dTC.parse(str,backref);
 								
 				std::string add;
 				if(!GCC_MANGLE) add = dTC.toString("","");//hack
@@ -231,12 +232,12 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 					if(hasNumericFirstChar(add))
 					{
 						int index = (int) (add[0]-'0');
-						int index2 = ((int)local_backref.size())-1;
-						if(index > index2) add = global_backref[index];
-						else add = local_backref[index];
+						int index2 = ((int)backref.size());
+						if(index < index2) add = backref[index];
+						else add = std::string("^b").append(i2s(index));
 					}
 					args.insert(args.end(),add);
-					local_backref.insert(local_backref.end(),add);
+					//local_backref.insert(local_backref.end(),add);
 				}
 			}
 		}
@@ -285,12 +286,12 @@ if(DO_DEBUG)		debug("parsing calling convention.\t",str);
 			
 if(DO_DEBUG)		debug("parsing return value type code.\t",str);
 			dataTypeCode rVTC;
-			rVTC.parse(str);
+			rVTC.parse(str,global_backref);
 			this->returnValueTypeCode = rVTC.toString("","");//hack
 
 if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			argumentList aL;
-			aL.parse(str);
+			aL.parse(str,global_backref);
 			this->argList = aL.toString();
 			this->aL_gcc = aL.toGCC();
 		}
@@ -344,13 +345,13 @@ if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			else
 			{
 				dataTypeCode rVTC;
-				rVTC.parse(str);
+				rVTC.parse(str,global_backref);
 				this->returnValueTypeCode = rVTC.toString("","");//hack
 			}
 			
 			//argli
 			argumentList aL;
-			aL.parse(str);
+			aL.parse(str,global_backref);
 			this->argList = aL.toString();
 			this->aL_gcc = aL.toGCC();
 		}
@@ -414,7 +415,7 @@ if (DO_DEBUG)		debug("unqualifiedTypeCode...",str);
 			}
 			else if(consume(str,"3")) //DataTypeCode
 			{
-				this->dTypeCode.parse(str);
+				this->dTypeCode.parse(str,global_backref);
 				this->isData = 1;
 			}
 			else if(consume(str,"S")||consume(str,"C")) //static -- please review/check for rules, if any
@@ -480,25 +481,25 @@ if (DO_DEBUG)		debug("unqualifiedTypeCode...",str);
 			else if(consume(str,"0"))
 			{
 				this->isData = 1;
-				this->dTypeCode.parse(str);
+				this->dTypeCode.parse(str,global_backref);
 				this->modifier = "private: static "; //or just private:?
 			}
 			else if(consume(str,"2")) /* Please try to fully understand the calling conventions at work here */
 			{
 				this->isData = 1;
-				this->dTypeCode.parse(str);
+				this->dTypeCode.parse(str,global_backref);
 				this->modifier = "public: static ";
 			}
 			else if(consume(str,"1")) /* Please try to fully understand the calling conventions at work here */
 			{
 				this->isData = 1;
-				this->dTypeCode.parse(str);
+				this->dTypeCode.parse(str,global_backref);
 				this->modifier = "protected: static ";
 			}
 			else if(consume(str,"4") || consume(str,"3")) /* Please try to fully understand the calling conventions at work here */
 			{
 				this->isData = 1;
-				this->dTypeCode.parse(str);
+				this->dTypeCode.parse(str,global_backref);
 			}
 			else if(consume(str,"S")) //static -- please review/check for rules, if any
 			{
@@ -596,7 +597,7 @@ if (DO_DEBUG)		debug("unqualifiedTypeCode...",str);
 
 				this->nameFragment = length.append(add);
 			}
-			void basicName::parse(std::string &str)
+			void basicName::parse(std::string &str,std::vector<std::string> &backref)
 			{
 if (DO_DEBUG)			std::cout << "Parsing basic name.\n";
 				
@@ -610,9 +611,27 @@ if (DO_DEBUG)			std::cout << "Parsing basic name.\n";
 					templateArg tA;
 					tA.parse(str);
 					this->hasTemplate = 1;
-					if(!GCC_MANGLE) this->templateStr = tA.toString();
-					else this->gcc_template = tA.toGCC();
-										
+					if(!GCC_MANGLE)
+					{
+						this->templateStr = tA.toString();
+						
+						//backref table addition
+						//debug("backref:\t",this->templateStr);
+						//std::cout << backref.size() << "\n";
+						//list(backref);
+						backref.push_back(this->templateStr);
+					}
+					else
+					{
+						this->gcc_template = tA.toGCC();
+						
+						//backref table addition
+						//debug("backref:\t",this->gcc_template);
+						//std::cout << backref.size() << "\n";
+						//list(backref);
+						backref.push_back(this->gcc_template);
+					}
+									
 					return;
 				}
 				else if(consume(str,"??")) //Nested Name
@@ -626,6 +645,12 @@ if (DO_DEBUG)			std::cout << "Parsing basic name.\n";
 					Not sure how to handle a statement like this.
 					*/
 					else this->nameFragment = std::string("");
+					
+					//backref table addition
+					//debug("backref:\t",this->nameFragment);
+					//std::cout << backref.size() << "\n";
+					//list(backref);
+					backref.push_back(this->nameFragment);
 					
 					NESTED = 0;
 					return;
@@ -655,12 +680,10 @@ if (DO_DEBUG)			std::cout << "Parsing basic name.\n";
 					int index = (int) (c-'0');
 					if(index >= 0 && index <= 9 && this->nameFragment.length()==0)
 					{
-						std::vector<std::string> gbr = getGlobalBackRef();
-						
-					if	(index>(gbr.size()-1)) this->nameFragment = std::string("[backref]");
+					if	(index>(backref.size()-1)) this->nameFragment = std::string("^b").append(i2s(index));
 					else	
 						{							
-							this->nameFragment = gbr[index];
+							this->nameFragment = backref[index];
 
 							std::stringstream len;
 							len << this->nameFragment.length();
@@ -677,14 +700,23 @@ if (DO_DEBUG)			std::cout << "Parsing basic name.\n";
 						c = consume1(str);
 					}
 if (DO_DEBUG)				debug("name-fragment end:",str);
-					/*if(!this->templateName)/**/ global_backref.insert(global_backref.end(),this->nameFragment);
+					/*if(!this->templateName)/**/ //global_backref.insert(global_backref.end(),this->nameFragment);
 					
 					std::stringstream len;
 					len << this->nameFragment.length();
 					std::string length = len.str();
 					
-					if(GCC_MANGLE) this->nameFragment = length.append(this->nameFragment);
+					if(GCC_MANGLE)
+					{						
+						this->nameFragment = length.append(this->nameFragment);
+					}
 					
+					//backref table addition
+					//debug("backref:\t",this->nameFragment);
+					//std::cout << backref.size() << "\n";
+					//list(backref);
+					backref.push_back(this->nameFragment);
+						
 					return;
 				}
 			}
@@ -705,31 +737,30 @@ if (DO_DEBUG)				debug("name-fragment end:",str);
 		( string '@' )* 
 	*/
 		qualification::qualification(){initial = 1;}
-		void qualification::parse(std::string &str)
+		void qualification::parse(std::string &str, std::vector<std::string> &backref)
 		{
 if (DO_DEBUG)		std::cout << "Parsing qualification.\n";
 			while(str[0]!='@')
 			{
-				if(isdigit(str[0]))
+				if(isdigit(str[0])) //Backreference
 				{
 					char c = consume1(str);
 					int index = c-'0';
-					std::vector<std::string> gbr = getGlobalBackRef();
 
-				if	(index>(gbr.size()-1)) this->contents.push_back("[backref]");
-				else
-				{
-					this->contents.push_back(gbr[index]);
-					basicName addition;
-					addition.build(gbr[index]);
-					this->bN_contents.push_back(addition);
-				}
-				
-				continue;
+					if	(index>(backref.size()-1)) this->contents.push_back(std::string("^b").append(i2s(index)));
+					else
+					{
+						this->contents.push_back(backref[index]);
+						basicName addition;
+						addition.build(backref[index]);
+						this->bN_contents.push_back(addition);
+					}
+					
+					continue;
 				}
 				
 				basicName bN;
-				bN.parse(str);
+				bN.parse(str,backref);
 				std::string add;
 				if(!GCC_MANGLE) add = bN.toString();
 				else add = bN.toGCC();
@@ -740,16 +771,25 @@ if (DO_DEBUG)		std::cout << "Parsing qualification.\n";
 if (DO_DEBUG)		debug("qualification end.\t",str);
 			//if(was_numeric) consume(str,"@");
 		}
-		std::string qualification::toString()
+		std::string qualification::toString(std::vector<std::string> backref)
 		{
+			std::string result = "";
+			if(this->contents.size() == 0) return "";			
 			if(initial)
 			{
 				std::reverse(this->contents.begin(),this->contents.end());
 				initial = 0;
 			}
-			return implode("::",this->contents);
+
+			result = check(this->contents[0],backref);
+			
+			for(int i = 1; i < this->contents.size(); i++)
+			{
+				result = result.append("::").append(check(this->contents[i],backref));
+			}
+			return result;
 		}
-		std::string qualification::toGCC()
+		std::string qualification::toGCC(std::vector<std::string> backref)
 		{
 			std::reverse(bN_contents.begin(),bN_contents.end());
 
@@ -759,6 +799,22 @@ if (DO_DEBUG)		debug("qualification end.\t",str);
 				out = out.append(bN_contents[i].toGCC());
 			}
 			return out;
+		}
+		std::string qualification::check(std::string s, std::vector<std::string> backref)
+		{
+			std::string out = "";
+			if(consume(s,"^b")) //Backreference marker
+			{
+				int index;
+				const char* c_str = s.c_str();
+				sscanf(c_str,"%d",&index);
+				s = std::string("^b").append(s);
+				std::cout << "backref index: " << index << "\n";
+				std::cout << "backref length: " << backref.size() << "\n";
+				//std::cout << "backref[0]: " << backref[0] << "\n";
+			}
+			//return out;
+			return s;
 		}
 	
 	/* Name with Template Arguments
@@ -773,11 +829,15 @@ if (DO_DEBUG)		debug("qualification end.\t",str);
 		{
 if (DO_DEBUG)		debug("template-begin:\t",str);
 			bN.templateName = 1;
-			this->bN.parse(str);
+
+			this->bN.parse(str,local_backref); //No backrefs should be needed here.  Please throw an error at some point if one is used.
+			
 			if(!GCC_MANGLE) this->name = this->bN.toString();
 			else this->name = this->bN.toGCC();
 			
-			this->aL.parse(str);
+			//local_backref.push_back(this->name);
+			
+			this->aL.parse(str,local_backref);
 			if(!GCC_MANGLE) this->arguments = this->aL.toString();
 			else this->gcc_arguments = this->aL.toGCC();
 					
@@ -788,7 +848,7 @@ if (DO_DEBUG)		debug("template-begin:\t",str);
 			//this->qualificn = q.toString();
 			
 			consume(str,"@"); //maybe this should be left uncommented?
-if (DO_DEBUG)		debug("template-end:\t",str);																																																												
+if (DO_DEBUG)		debug("template-end:\t",str);
 		}
 		std::string templateArg::toString()
 		{
@@ -800,4 +860,3 @@ if (DO_DEBUG)		debug("template-end:\t",str);
 			return this->name.append("I").append(this->gcc_arguments).append("E");
 		}
 }
-	
