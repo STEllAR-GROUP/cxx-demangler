@@ -238,16 +238,24 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 		consume(s,"$$");	//This is a hack, fix it when you understand it.
 		if(consume(s,"$")) //These are hacks, please clean up and make valid
 		{
-			if(consume(s,"0")) //Hack -- Please incorporate real definitions.
+			if(consume(s,"0"))
 			{
+				std::string lit;
 				if(isdigit(s[0]))
 				{
-					consume1(s);
-					return "[int-val]";
+					char c = consume1(s);
+					int i = c-'0';
+					lit = i2s(i+1);
 				}
-				while(s[0]!='@') consume1(s);
-				consume(s,"@");
-				return "[int-val]";
+				else
+				{
+					std::string hex;
+					while(s[0]!='@') hex.push_back(consume1(s));
+					consume(s,"@");
+					lit = i2s(hex2dec(hex));
+				}
+				if(!GCC_MANGLE) return std::string("^int").append(lit);
+				else return std::string("Li").append(lit).append("E");
 			}
 			else if(consume(s,"H") || consume(s,"1")) //$1?...: no documentation.
 			{	//Unknown properties according to mearie.org...
@@ -278,6 +286,8 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 			
 			{"A",	"&",	"&"},	//Type modifier (reference)
 			{"B",	 "???",	"[Type Modifier (Volatile Reference)]"},	//Type modifier (reference)
+			
+			//Primitive datatypes: C to O; all others should be considered "extended"
 			{"C",	 "a",	"signed char"},
 			{"D",	 "c",	"char"},
 			{"E",	 "h",	"unsigned char"},

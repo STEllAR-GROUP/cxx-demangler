@@ -74,6 +74,7 @@ namespace cxx_demangler
 	struct argumentList{
 		std::vector<std::string> args;	
 		std::vector<std::string> local_backref;
+		int forTemplate;
 		argumentList();
 		void parse(std::string &str, std::vector<std::string> &backref);
 		std::string toString();

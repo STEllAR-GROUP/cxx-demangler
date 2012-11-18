@@ -117,13 +117,15 @@ if (DO_DEBUG)	debug("consume:",ss);
 		}
 		return s;
 	}
-	std::string replace(std::string str, std::string from, std::string to) {
+	std::string replace(std::string str, std::string from, std::string to) { //Find a library to handle functions like this more efficiently.
+		std::string init = str;
 		if(from.empty()) return str;
 		size_t start_pos = 0;
 		while((start_pos = str.find(from, start_pos)) != std::string::npos) {
 			str.replace(start_pos, from.length(), to);
 			start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
 		}
+		if(!str_match(str,init)) return replace(str, from, to);
 		return str;
 	}
 	int eq(std::string a, std::string b)
@@ -135,7 +137,7 @@ if (DO_DEBUG)	debug("consume:",ss);
 		}
 		return 1;
 	}
-	std::string i2s(int x)
+	std::string i2s(long int x)
 	{
 		std::stringstream ss;
 		ss << x;
@@ -151,5 +153,15 @@ if (DO_DEBUG)	debug("consume:",ss);
 			if(i<s.size()-1) std::cout << ",";
 		}
 		std::cout << "]" << "\n";
+	}
+	
+	long int hex2dec(std::string s)
+	{
+		long int out;
+		long int max = 50107951786;
+		std::stringstream stream;
+		stream << s;
+		stream >> std::hex >> out;
+		return out%max;
 	}
 }

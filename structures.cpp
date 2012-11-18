@@ -120,10 +120,16 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 		
 		int isPointer;
 		int isFPointer;
+		int isPrimitive;
+		
 		functionTypeCode fTC;
-		dataTypeCode(){}		
+		dataTypeCode(){}
 		void parse(std::string &str,std::vector<std::string> &backref)
 		{
+			char c = str[0];
+			if(c <= 'O' && c >= 'C') this->isPrimitive = 1;
+			else this->isPrimitive = 0;
+			
 			this->isFPointer = 0;
 			
 			std::string dt = getNextDataType(str,backref);
@@ -193,7 +199,7 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 	If the parameter list is not void and does not end in elipsis,
 	its encoding is terminated by an @. 
 	*/
-		argumentList::argumentList(){}
+		argumentList::argumentList(){this->forTemplate = 0;}
 		void argumentList::parse(std::string &str,std::vector<std::string> &backref)
 		{
 			local_backref.clear();
@@ -209,6 +215,12 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 				else add = dTC.toGCC();
 				
 		if(DO_DEBUG)	debug("arglist parsed:\t",add);
+		
+				if(!dTC.isPrimitive)
+				{
+					//std::cout << "backref:" << backref.size() << "\t" << add << "\n";
+					local_backref.push_back(add);
+				}
 				
 				if(str_match(dTC.exceptionCode,"Q"))
 				{
@@ -218,6 +230,8 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 				
 				if(str_match(add,"Z")||str_match(add,"z"))
 				{
+					if(this->forTemplate){}//Illegal datatype under these conditions.  Terminate.
+					
 					if(GCC_MANGLE) args.push_back(std::string("z"));
 					else args.push_back(std::string("...")); //Is this acceptable?
 					break;
@@ -225,7 +239,7 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 				else if(str_match(add,"void")||str_match(add,"v"))
 				{
 					args.push_back(add);
-					break;
+					if(!this->forTemplate) break; //Template arguments are not terminated by voids.
 				}
 				else
 				{
@@ -233,7 +247,7 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 					{
 						int index = (int) (add[0]-'0');
 						int index2 = ((int)backref.size());
-						if(index < index2) add = backref[index];
+						if(index < index2) add = local_backref[index];
 						else add = std::string("^b").append(i2s(index));
 					}
 					args.insert(args.end(),add);
@@ -587,15 +601,17 @@ if (DO_DEBUG)		debug("unqualifiedTypeCode...",str);
 			basicName::basicName(){this->templateName = 0;}
 			void basicName::build(std::string add)
 			{
-				this->hasOperator = 0;
+				this->nameFragment = add;
+/*				this->hasOperator = 0;
 				this->hasTemplate = 0;
 
 				std::stringstream len;
 				len << add.length();
 				std::string length = len.str();
 
-
 				this->nameFragment = length.append(add);
+				std::cout << len.str() << "\t" << add << "\t" << this->nameFragment << "\n";
+*/
 			}
 			void basicName::parse(std::string &str,std::vector<std::string> &backref)
 			{
@@ -685,12 +701,12 @@ if (DO_DEBUG)			std::cout << "Parsing basic name.\n";
 						{							
 							this->nameFragment = backref[index];
 
-							std::stringstream len;
+/*							std::stringstream len;
 							len << this->nameFragment.length();
 							std::string length = len.str();
 							
 							if(GCC_MANGLE) this->nameFragment = length.append(this->nameFragment);
-						}
+*/						}
 						return;
 					}
 
@@ -837,6 +853,7 @@ if (DO_DEBUG)		debug("template-begin:\t",str);
 			
 			//local_backref.push_back(this->name);
 			
+			this->aL.forTemplate = 1;
 			this->aL.parse(str,local_backref);
 			if(!GCC_MANGLE) this->arguments = this->aL.toString();
 			else this->gcc_arguments = this->aL.toGCC();

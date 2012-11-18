@@ -119,7 +119,7 @@ if (DO_DEBUG)		debug("parsing storage class:\t",str);
 		global_backref.clear();
 if (DO_DEBUG)	std::cout << "mangled-name end\n\n";
 		out = replace(rmws(trim(out)),">>","> >");
-		
+		out = replace(out,"^int","");
 		if(GCC_MANGLE && !NESTED) out = std::string("_Z").append(out);
 		
 		return out;
@@ -131,7 +131,6 @@ if (DO_DEBUG)	std::cout << "mangled-name end\n\n";
 		std::string solution;
 		
 		if(code==1) GCC_MANGLE = 1;
-		//std::cout << "gcc-mangle set\t" << GCC_MANGLE << "\n";
 		
 		if(!code)
 		{
@@ -145,12 +144,9 @@ if (DO_DEBUG)	std::cout << "mangled-name end\n\n";
 		
 		global_backref.clear();
 		
-		//std::cout << "here...\n";
 		std::string s = parseMangledName(str);
-		//std::cout << "done...\n";
 		
 		GCC_MANGLE = 0;
-		//std::cout << "gcc-mangle unset\t" << GCC_MANGLE << "\n";
 
 		if(!code)
 		{	int cc = eq(s,solution);
@@ -172,7 +168,7 @@ int main(int argc, char** argv){
 	std::cout << "Enter Query." << std::endl;
 	int i = 1;
 	
-	int start = 6;
+	int start = 0;
 	int stop = 256;
 	
 	while(1)
