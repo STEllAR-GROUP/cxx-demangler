@@ -27,6 +27,7 @@ namespace cxx_demangler
 	std::string implode(std::string,std::vector<std::string>);
 	std::string parseQualification(std::string &str);
 	void debug(std::string a, std::string &b);
+	std::string syscall(std::string);
 
 	/*
 	* datatypes headers
@@ -105,7 +106,7 @@ namespace cxx_demangler
 			aL_gcc;		
 		functionTypeCode();
 		void parse(std::string &str);
-		std::string toString(std::string name);
+		std::string toString(std::string name, std::string suffix);
 		std::string toGCC();
 	};
 	

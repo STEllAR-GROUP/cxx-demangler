@@ -19,7 +19,7 @@ namespace cxx_demangler
 			std::string callingConvention = getNextCallingConvention(str);
 			dataTypeCode rVTC;
 			rVTC.parse(str,backref);
-			std::string returnValueTypeCode = rVTC.toString("","");//hack
+			std::string returnValueTypeCode = rVTC.toString("","","");//hack
 			argumentList aL;
 			aL.parse(str,backref);
 			std::string argList = aL.toString();
@@ -47,7 +47,7 @@ namespace cxx_demangler
 			std::string callingConvention = getNextCallingConvention(str);
 			dataTypeCode rVTC;
 			rVTC.parse(str,backref);
-			std::string returnValueTypeCode = rVTC.toString("","");//hack
+			std::string returnValueTypeCode = rVTC.toString("","","");//hack
 			argumentList aL;
 			aL.parse(str,backref);
 			std::string argList = aL.toString();
@@ -56,8 +56,16 @@ namespace cxx_demangler
 			c.parse(str);
 
 			std::string n = "";
-			
-			return "[named-pointer?]";
+
+			return	std::string("(")
+				.append(callingConvention)
+				.append(" ")
+				.append(q.toString(backref))
+				.append("::")
+				.append(bN.toString())
+				.append("::")
+				.append(rVTC.toString("","",""))
+				.append(")");
 		}
 	else	if(str_match(s,"P")) //Needs revision -- another pointer
 		{
@@ -69,8 +77,19 @@ namespace cxx_demangler
 			
 			if(GCC_MANGLE) return std::string("P").append(dataType);
 
-			std::string out = dataType.append(" * ").append(sC.postfix);
+			/*
+			std::string out = dataType.append(" * ").append(sC.suffix);
 			if(sC.display==1) out = out.append(" ").append(sC.toString());
+			*/
+
+			//Fixes "char const * __ptr64" formatting.  Please verify that this works properly in all scenarios.
+			
+			std::string out = dataType;
+			if(sC.display==1) out = out.append(" ").append(sC.toString());
+			out = out.append(" * ").append(sC.suffix);
+			
+			//std::cout << out << "\n";
+			
 			return out;
 /*			return std::string("(")
 			.append(prefix)
@@ -165,14 +184,14 @@ namespace cxx_demangler
 			
 			if(!GCC_MANGLE)
 			{
-				return rVTC.toString("","")//hack
+				return rVTC.toString("","","")//hack
 				.append(" ")
 				.append(sC.toString())
 				.append(" * ")
-				.append(sC.postfix)
+				.append(sC.suffix)
 				;
 			}
-			else return std::string("P").append(rVTC.toString("",""));
+			else return std::string("P").append(rVTC.toString("","",""));
 		}
 	else	if(str_match(s,"?")) //Modifier
 		{
@@ -214,16 +233,16 @@ namespace cxx_demangler
 			std::string sClass = sC.toString(); //Going by vc++filt's output conventions.  Or maybe it actually is callingConvention.
 			dataTypeCode rVTC;
 			rVTC.parse(str,backref);
-			std::string returnValueTypeCode = rVTC.toString("","");//hack
+			std::string returnValueTypeCode = rVTC.toString("","","");//hack
 			std::string out =
 				returnValueTypeCode.append(" ")
 				.append(sClass)
 				.append(" ")
 				.append("&");
 				
-				if(sC.postfix.length()>0) out = out
+				if(sC.suffix.length()>0) out = out
 				.append(" ")
-				.append(sC.postfix);
+				.append(sC.suffix);
 				
 			if(GCC_MANGLE) out = std::string("R").append(sC.toGCC()).append(rVTC.toGCC());
 				return out;
@@ -269,7 +288,7 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 		std::string options[100][3] =
 		{
 			{"@X",	 "v",	"void"},
-			{"@",	 "@",	"@"},
+//			{"@",	 "@",	"@"},
 
 			{"0",	 "0",	"0"},
 			{"1",	 "1",	"1"},
@@ -285,7 +304,7 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 			{"A6",	"P6",	"P6"},	//This is a hack, fix it when you understand it.
 			
 			{"A",	"&",	"&"},	//Type modifier (reference)
-			{"B",	 "???",	"[Type Modifier (Volatile Reference)]"},	//Type modifier (reference)
+//			{"B",	 "???",	"[Type Modifier (Volatile Reference)]"},	//Type modifier (reference)
 			
 			//Primitive datatypes: C to O; all others should be considered "extended"
 			{"C",	 "a",	"signed char"},
@@ -308,54 +327,52 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 			
 			{"P",	 "P",	"P"},
 			{"Q",	 "Q",	"Q"},
-			{"S",	 "???",	"[Type modifier (const volatile pointer)]"},
-			{"U",	 "U",	"U"},
-			{"V",	 "V",	"V"},
-			{"W",	 "W",	"W"},
+//			{"S",	 "???",	"[Type modifier (const volatile pointer)]"},
+			{"U",	 "U",	"U"}, //struct
+			{"V",	 "V",	"V"}, //class
+			{"W",	 "W",	"W"}, //enum
 			{"X",	 "v",	"void"},
-			{"Z",	 "z",	"Z"},
+			{"Z",	 "z",	"Z"}, //... ("unlimited arguments")
 			{"?",	"?",	"?"},
 			
 			//Implement all of these once you have internet access again.
-			{"_0",	"???",	"{_0}"},
-			{"_1",	"???",	"{_1}"},
-			{"_2",	"???",	"{_2}"},
-			{"_3",	"???",	"{_3}"},
-			{"_4",	"???",	"{_4}"},
-			{"_5",	"???",	"{_5}"},
-			{"_6",	"???",	"{_6}"},
-			{"_7",	"???",	"{_7}"},
-			{"_8",	"???",	"{_8}"},
-			{"_9",	"???",	"{_9}"},
+//			{"_0",	"???",	"{_0}"},
+//			{"_1",	"???",	"{_1}"},
+//			{"_2",	"???",	"{_2}"},
+//			{"_3",	"???",	"{_3}"},
+//			{"_4",	"???",	"{_4}"},
+//			{"_5",	"???",	"{_5}"},
+//			{"_6",	"???",	"{_6}"},
+//			{"_7",	"???",	"{_7}"},
+//			{"_8",	"???",	"{_8}"},
+//			{"_9",	"???",	"{_9}"},
 
-			{"_A",	"???",	"{_A}"},
-			{"_B",	"???",	"{_B}"},
-			{"_C",	"???",	"{_C}"},
-			{"_D",	"???",	"{_D}"},
-			{"_E",	"???",	"{_E}"},
-			{"_F",	"???",	"{_F}"},
-			{"_G",	"???",	"{_G}"},
-			{"_H",	"???",	"{_H}"},
-			{"_I",	"???",	"{_I}"},
-			{"_J",	"x",	"__int64"},
-			{"_K",	"y",	"unsigned __int64"},
-			{"_L",	"???",	"{_L}"},
-			{"_M",	"???",	"{_M}"},
+//			{"_A",	"???",	"{_A}"},
+//			{"_B",	"???",	"{_B}"},
+//			{"_C",	"???",	"{_C}"},
+			{"_D",	"???",	"__int8"},
+			{"_E",	"???",	"unsigned __int8"},
+			{"_F",	"???",	"__int16"},
+			{"_G",	"???",	"unsigned __int16"},
+			{"_H",	"???",	"__int32"},
+			{"_I",	"???",	"unsigned __int32"},
+			{"_J",	"x",	"__int64"}, //or long long
+			{"_K",	"y",	"unsigned __int64"}, //or unsigned long long
+			{"_L",	"???",	"__int128"},
+			{"_M",	"???",	"unsigned __int128"},
 			{"_N",	"b",	"bool"},
-			{"_O",	"???",	"{_O}"},
-			{"_P",	"???",	"{_P}"},
-			{"_Q",	"???",	"{_Q}"},
-			{"_R",	"???",	"{_R}"},
-			{"_S",	"???",	"{_S}"},
-			{"_T",	"???",	"{_T}"},
-			{"_U",	"???",	"{_U}"},
-			{"_V",	"???",	"{_V}"},
+//			{"_O",	"???",	"{_O}"}, //Array
+//			{"_P",	"???",	"{_P}"},
+//			{"_Q",	"???",	"{_Q}"},
+//			{"_R",	"???",	"{_R}"},
+//			{"_S",	"???",	"{_S}"},
+			{"_T",	"e",	"long double"}, //see calling_conventions
+//			{"_U",	"???",	"{_U}"},
+//			{"_V",	"???",	"{_V}"},
 			{"_W",	"w",	"wchar_t"},
-			{"_X",	"???",	"{_X}"},
-			{"_Y",	"???",	"{_Y}"},
-			{"_Z",	"???",	"{_Z}"},
-			
-			{"",	"",	""}
+//			{"_X",	"???",	"{_X}"}, //Complex Type (coclass)
+//			{"_Y",	"???",	"{_Y}"}, //Complex Type (cointerface)
+			{"_Z",	"e",	"long double"}, //see calling_conventions
 		};
 		int i = 0;
 		while(options[i][0].length()>0)
@@ -363,83 +380,26 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 			if(consume(s,options[i][0]))
 			{
 				std::string result;
-				if(GCC_MANGLE) result = options[i][1];
+				if(GCC_MANGLE)
+				{
+					if(str_match(options[i][1],"???")||str_match(options[i][1],""))
+					{
+						std::string error("unidentified GCC data type code (cxx_demangler::getNextDataType())");
+						throw error;
+					}
+					result = options[i][1];
+				}
 				else result = options[i][2];//checkExceptions(options[i][1],s);
 				return result;
 			}
 			i++;
 		}
-		return "";
-	}
-
-	/* For more information regarding class modifiers, please refer to:
-	 * https://en.wikipedia.org/wiki/Microsoft_Visual_C%2B%2B_Name_Mangling#Type_Modifier
-	 */
-	std::string getNextStorageClass(std::string &str)
-	{
-		std::string out = "";
-/*		
-		std::string options[100][2] =
-		{
-			{"A",	"normal"},
-			{"B",	"const"},
-			{"C",	"volatile"},
-			{"D",	"const volatile"},
-			{"E",	"far"},
-			{"F",	"const far"},
-			{"G",	"volatile far"},
-			{"H",	"const volatile far"},
-			{"I",	"huge"},
-			{"Z",	"executable"}
-		};
-*/
-		std::string options[100][2] =
-		{
-			{"A",	"normal"},
-			{"B",	"const"},
-			{"C",	"volatile"},
-			{"D",	"const volatile"},
-			{"Z",	"executable"},
-			{"",""}
-		};
-		int i = 0;
+		std::string err("unidentified data type code (cxx_demangler::getNextDataType())");
+		throw err;
 		
-		while(options[i][0].length()>0)
-		{
-			if(consume(str,options[i][0]))
-			{
-				if(GCC_MANGLE) return options[i][1];
-				return options[i][2];
-			}
-			i++;
-		}
-		return checkPrefix(str);
-	}
-	std::string checkPrefix(std::string &str)
-	{
-		std::string prefix;
-		std::string postfix;
-
-		if(consume(str,"E")) //__ptr64
-		{
-			prefix = getNextStorageClass(str);
-			postfix = "__ptr64";
-			return prefix.append(" ").append(postfix);
-		}
-	else	if(consume(str,"F")) //__unaligned
-		{
-			postfix = getNextStorageClass(str);
-			prefix = "__unaligned";
-			return prefix.append(" ").append(postfix);
-		}
-	else	if(consume(str,"I")) //__restrict
-		{
-			prefix = getNextStorageClass(str);
-			postfix = "__restrict";
-			return prefix.append(" ").append(postfix);
-		}
 		return "";
 	}
+
 	std::string getNextCallingConvention(std::string &s)
 	{
 		if(consume(s,"A")||consume(s,"B")) return "__cdecl";
@@ -663,29 +623,29 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 		if(GCC_MANGLE) return "eO";
 		return "operator^=";
 	}
-	else	if(consume(s,"_7")) return "`vftable'";
-	else	if(consume(s,"_8")) return "`vbtable'";
-	else	if(consume(s,"_9")) return "`vcall'";
-	else	if(consume(s,"_A")) return "`typeof'";
-	else	if(consume(s,"_B")) return std::string("`local static guard'");
-	else	if(consume(s,"_C")) return std::string("`string'");
-	else    if(consume(s,"_D")) return "`vbase destructor'";
-	else    if(consume(s,"_E")) return "`vector deleting destructor'";
-	else	if(consume(s,"_F")) return "`default constructor closure'";
-	else	if(consume(s,"_G")) return "`scalar deleting destructor'";
-	else	if(consume(s,"_H")) return "`vector constructor iterator'";
-	else	if(consume(s,"_I")) return "`vector destructor iterator'";
-	else	if(consume(s,"_J")) return "`vector vbase constructor iterator'";
-	else	if(consume(s,"_K")) return "`virtual displacement map'";
-	else	if(consume(s,"_L")) return "`eh vector constructor iterator'";
-	else	if(consume(s,"_M")) return "`eh vector destructor iterator'";
-	else	if(consume(s,"_N")) return "`eh vector vbase constructor iterator'";
-	else	if(consume(s,"_O")) return "`copy constructor closure'";
-	else	if(consume(s,"_P")) return "`udt returning'";
+	else	if(consume(s,"_7") && !GCC_MANGLE) return "`vftable'";
+	else	if(consume(s,"_8") && !GCC_MANGLE) return "`vbtable'";
+	else	if(consume(s,"_9") && !GCC_MANGLE) return "`vcall'";
+	else	if(consume(s,"_A") && !GCC_MANGLE) return "`typeof'";
+	else	if(consume(s,"_B") && !GCC_MANGLE) return std::string("`local static guard'");
+	else	if(consume(s,"_C") && !GCC_MANGLE) return std::string("`string'");
+	else    if(consume(s,"_D") && !GCC_MANGLE) return "`vbase destructor'";
+	else    if(consume(s,"_E") && !GCC_MANGLE) return "`vector deleting destructor'";
+	else	if(consume(s,"_F") && !GCC_MANGLE) return "`default constructor closure'";
+	else	if(consume(s,"_G") && !GCC_MANGLE) return "`scalar deleting destructor'";
+	else	if(consume(s,"_H") && !GCC_MANGLE) return "`vector constructor iterator'";
+	else	if(consume(s,"_I") && !GCC_MANGLE) return "`vector destructor iterator'";
+	else	if(consume(s,"_J") && !GCC_MANGLE) return "`vector vbase constructor iterator'";
+	else	if(consume(s,"_K") && !GCC_MANGLE) return "`virtual displacement map'";
+	else	if(consume(s,"_L") && !GCC_MANGLE) return "`eh vector constructor iterator'";
+	else	if(consume(s,"_M") && !GCC_MANGLE) return "`eh vector destructor iterator'";
+	else	if(consume(s,"_N") && !GCC_MANGLE) return "`eh vector vbase constructor iterator'";
+	else	if(consume(s,"_O") && !GCC_MANGLE) return "`copy constructor closure'";
+	else	if(consume(s,"_P") && !GCC_MANGLE) return "`udt returning'";
 	//else	if(consume(s,"_Q")) return "`'";
 	//else	if(consume(s,"_R")) return "`'"; //RTTI-related code
-	else	if(consume(s,"_S")) return "`local vftable'";
-	else	if(consume(s,"_T")) return "`local vftable constructor closure'";
+	else	if(consume(s,"_S") && !GCC_MANGLE) return "`local vftable'";
+	else	if(consume(s,"_T") && !GCC_MANGLE) return "`local vftable constructor closure'";
 	else	if(consume(s,"_U"))
 	{
 		if(GCC_MANGLE) return "na";
@@ -696,15 +656,18 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 		if(GCC_MANGLE) return "da";
 		return "operator delete[]";
 	}	
-	else	if(consume(s,"_X")) return "`placement delete closure'";
-	else	if(consume(s,"_X")) return "`placement delete[] closure'";
-	else	if(consume(s,"__A")) return "`managed vector constructor iterator'";
-	else	if(consume(s,"__B")) return "`managed vector destructor iterator'";
-	else	if(consume(s,"__C")) return "`eh vector copy constructor iterator'";
-	else	if(consume(s,"__D")) return "`eh vector vbase copy constructor iterator'";
-	else	if(consume(s,"_") && consume1(s)) return "{_X}";	//Hack, please add real definitions
+	else	if(consume(s,"_X") && !GCC_MANGLE) return "`placement delete closure'";
+	else	if(consume(s,"_Y") && !GCC_MANGLE) return "`placement delete[] closure'";
+	else	if(consume(s,"__A") && !GCC_MANGLE) return "`managed vector constructor iterator'";
+	else	if(consume(s,"__B") && !GCC_MANGLE) return "`managed vector destructor iterator'";
+	else	if(consume(s,"__C") && !GCC_MANGLE) return "`eh vector copy constructor iterator'";
+	else	if(consume(s,"__D") && !GCC_MANGLE) return "`eh vector vbase copy constructor iterator'";
+	//else	if(consume(s,"_") && consume1(s)) return "{_X}";	//Hack, please add real definitions
+	
+	std::string err("unidentified operator code (cxx_demangler::storageClass::getNextOpCode())");
+	throw err;
 	}
-	//{__X}
+
 	std::string getRealType(std::string &s)
 	{
 		if(consume(s,"0")) return "char";
@@ -715,5 +678,8 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 	else	if(consume(s,"5")) return "unsigned int";
 	else	if(consume(s,"6")) return "long";
 	else	if(consume(s,"7")) return "unsigned long";
+	
+	std::string err("unidentified real type");
+	throw err;
 	}
 }

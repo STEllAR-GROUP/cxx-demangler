@@ -164,4 +164,26 @@ if (DO_DEBUG)	debug("consume:",ss);
 		stream >> std::hex >> out;
 		return out%max;
 	}
+	
+	std::string syscall(std::string command)
+	{
+		FILE *fp;
+		const char * cmd = command.c_str();
+
+		fp = popen(cmd,"r");
+
+		char* buffer;
+
+		size_t len = 0;
+
+		while (getline(&buffer, &len, fp) != -1)
+
+		command = buffer;
+
+		free(buffer);
+		pclose(fp);
+
+		rtrim(command);
+		return command;
+	}
 }

@@ -16,26 +16,34 @@ namespace cxx_demangler
 	*/
 	struct storageClass{
 		std::string sClass;
-		std::string postfix;
+		std::string prefix;
+		std::string suffix;
 		
 		int display;
-		storageClass(){}
+		storageClass(){
+			this->prefix = "";
+			this->suffix = "";
+		}
 
 		void checkPrefix(std::string &str)
 		{
-			std::string postfix;
+			std::string suffix;
 
 			if(consume(str,"E")) //__ptr64
 			{
-				this->postfix = " __ptr64";
+				this->suffix = " __ptr64";
 			}
 		else	if(consume(str,"F")) //__unaligned
 			{
-				this->postfix = " __unaligned";
+				this->suffix = " __unaligned";
 			}
 		else	if(consume(str,"I")) //__restrict
 			{
-				this->postfix = " __restrict";
+				this->suffix = " __restrict";
+			}
+		else	{
+				std::string err("unidentified storage class or prefix/suffix (cxx_demangler::storageClass::checkPrefix())");
+				throw err;
 			}
 			this->getNextStorageClass(str);
 		}
@@ -49,7 +57,6 @@ namespace cxx_demangler
 				{"C",	"V",	"volatile"},
 				{"D",	"",	"const volatile"},
 				{"Z",	"",	"executable"},
-				{"",	"",	""}
 			};
 			int i = 0;
 			while(options[i][0].length()>0)
@@ -77,9 +84,9 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 			if(display==1) return this->sClass;
 			else return "";
 		}
-		std::string getPostfix()
+		std::string getSuffix()
 		{
-			return this->postfix;
+			return this->suffix;
 		}
 		std::string toGCC()
 		{
@@ -122,6 +129,8 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 		int isFPointer;
 		int isPrimitive;
 		
+		storageClass _sC;
+		
 		functionTypeCode fTC;
 		dataTypeCode(){}
 		void parse(std::string &str,std::vector<std::string> &backref)
@@ -147,9 +156,9 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 				this->pointerStorageClass = sC.toString();
 			}
 		}
-		std::string toString(std::string sC,std::string name)
+		std::string toString(std::string sC,std::string name,std::string suffix)
 		{
-			if(this->isFPointer)
+			if(this->isFPointer) //Please add the suffix where appropriate.
 			{
 				std::string out = this->fTC.returnValueTypeCode
 				.append(" (")
@@ -171,10 +180,12 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 			}
 			else
 			{
-				std::string out = this->contents;
-				if(sC.length()>0) out = out.append(" ").append(sC);
-				if(name.length()>0) out = out.append(" ").append(name);
-				return rmws(out);
+				std::string out = this->contents; //Type
+				if(sC.length()>0) out = out.append(" ").append(sC); //Storage Class
+				if(suffix.length()>0) out = out.append(" ").append(suffix);
+				if(name.length()>0) out = out.append(" ").append(name); //Name, if any
+				//std::cout << "sC:\t" << out << "\n";
+				return rmws(out); //Remove excess whitespace, return
 			}
 		}
 		std::string toGCC()
@@ -211,7 +222,7 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 				dTC.parse(str,backref);
 								
 				std::string add;
-				if(!GCC_MANGLE) add = dTC.toString("","");//hack
+				if(!GCC_MANGLE) add = dTC.toString("","","");//hack
 				else add = dTC.toGCC();
 				
 		if(DO_DEBUG)	debug("arglist parsed:\t",add);
@@ -286,7 +297,7 @@ if(DO_DEBUG)		debug("parsing next storage class...\t",str);
 			return this->cConvention;
 		}
 	};
-	
+
 	/* FunctionTypeCode:
 		CallingConvention ReturnValueTypeCode ArgumentList
 	*/
@@ -301,7 +312,7 @@ if(DO_DEBUG)		debug("parsing calling convention.\t",str);
 if(DO_DEBUG)		debug("parsing return value type code.\t",str);
 			dataTypeCode rVTC;
 			rVTC.parse(str,global_backref);
-			this->returnValueTypeCode = rVTC.toString("","");//hack
+			this->returnValueTypeCode = rVTC.toString("","","");//hack
 
 if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			argumentList aL;
@@ -309,7 +320,7 @@ if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			this->argList = aL.toString();
 			this->aL_gcc = aL.toGCC();
 		}
-		std::string functionTypeCode::toString(std::string name)
+		std::string functionTypeCode::toString(std::string name,std::string suffix)
 		{
 			std::string out = "";
 			return out
@@ -321,7 +332,7 @@ if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			.append("(")
 			.append(this->argList)
 			.append(")")
-//			.append(this->postfix)
+//			.append(this->suffix)
 			;
 		}
 		std::string functionTypeCode::toGCC()
@@ -335,7 +346,7 @@ if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			cConvention,
 			returnValueTypeCode,
 			argList,
-			postfix,
+			suffix,
 			aL_gcc
 			;
 		storageClass sC;
@@ -346,7 +357,7 @@ if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			//storage class
 			sC.parse(str);
 			this->container = sC.toString();
-			this->postfix = sC.getPostfix();
+			this->suffix = sC.getSuffix();
 			
 			//calling convention
 			callingConvention cC;
@@ -360,7 +371,7 @@ if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			{
 				dataTypeCode rVTC;
 				rVTC.parse(str,global_backref);
-				this->returnValueTypeCode = rVTC.toString("","");//hack
+				this->returnValueTypeCode = rVTC.toString("","","");//hack
 			}
 			
 			//argli
@@ -369,7 +380,7 @@ if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			this->argList = aL.toString();
 			this->aL_gcc = aL.toGCC();
 		}
-		std::string toString(std::string name)
+		std::string toString(std::string name,std::string suffix)
 		{
 			std::string out = "";
 			return out
@@ -384,7 +395,7 @@ if(DO_DEBUG)		debug("parsing argument list.\t",str);
 			.append(")")
 			.append(sC.toString())
 			.append(" ")
-			.append(this->postfix)
+			.append(this->suffix)
 			;
 		}
 		std::string toGCC()
@@ -394,72 +405,11 @@ if(DO_DEBUG)		debug("parsing argument list.\t",str);
 
 	};
 
-	//Please unify _nqualifiedTypeCode and _ualifiedTypeCode into a single struct when convenient.
-	struct typeCode{
-	};
-	
-	/* UnqualifiedTypeCode:
-		'Y' FunctionTypeCode
-		'3' DataTypeCode
-	*/
-	struct unqualifiedTypeCode{
-		std::string
-			funcType,
-			dataType;
-		int
-			isFunction,
-			isData,
-			isStatic;
-		
-		functionTypeCode fTypeCode;
-		functionTypeCode sTypeCode;
-		dataTypeCode dTypeCode;
-		
-		unqualifiedTypeCode(){}
-		void parse(std::string &str)
-		{
-if (DO_DEBUG)		debug("unqualifiedTypeCode...",str);
-
-			this->isFunction = this->isData = this->isStatic = 0;
-			
-			if(consume(str,"Y")) //FunctionTypeCode
-			{
-				this->fTypeCode.parse(str);
-				this->isFunction = 1;
-			}
-			else if(consume(str,"3")) //DataTypeCode
-			{
-				this->dTypeCode.parse(str,global_backref);
-				this->isData = 1;
-			}
-			else if(consume(str,"S")||consume(str,"C")) //static -- please review/check for rules, if any
-			{
-				this->sTypeCode.parse(str);
-				this->isStatic = 1;
-			}
-			else if(consume(str,"6")) //static -- please review/check for rules, if any
-			{
-				return;
-			}
-		}
-		std::string toString(std::string name,std::string sC)
-		{
-			if(this->isFunction) return this->fTypeCode.toString(name);
-		else	if(this->isData) return this->dTypeCode.toString(sC,name);//are these valid?  the storageclass may be different...
-		else	if(this->isStatic) return this->sTypeCode.toString(name);
-		}
-		std::string toGCC()
-		{
-			if(this->isFunction) return this->fTypeCode.toGCC();
-		else	if(this->isData) return "";//this->dTypeCode.toGCC();//are these valid?  the storageclass may be different...
-		else	if(this->isStatic) return this->sTypeCode.toGCC();
-		}
-	};
-
 	/* QualifiedTypeCode:
 		'Q' FunctionTypeCode
 		'2' DataTypeCode
 	*/
+	//Unified. Serves to parse both qualified and unqualified type codes.  Rename as such.
 	struct qualifiedTypeCode{
 		std::string
 			fTypeCode,
@@ -479,18 +429,64 @@ if (DO_DEBUG)		debug("unqualifiedTypeCode...",str);
 		{
 			this->isFunction = this->isData = this->isStatic = this->isVirtual = 0;
 			
-			if(consume(str,"A"))
+			if(consume(str,"A")||consume(str,"B"))//private default, private far
 			{
 				this->isFunction = 1;
 				this->fTypeCode2.parse(str);
 				this->modifier = "private: ";
 			}
-
-			if(consume(str,"Q"))
+			else if(consume(str,"C")||consume(str,"D")) //private static, private static far
+			{
+				this->modifier = "private: static";
+				this->isStatic = 1;
+				this->sTypeCode.parse(str);
+			}
+			else if(consume(str,"E")||consume(str,"F")) //private virtual, private virtual far
+			{
+				this->isFunction = 1;
+				this->fTypeCode2.parse(str);
+				this->modifier = "private: virtual ";
+			}
+			else if(consume(str,"I")||consume(str,"J"))
+			{
+				this->isFunction = 1;
+				this->modifier = "protected:";
+				fTypeCode2.parse(str);
+			}
+			else if(consume(str,"K")||consume(str,"L"))
+			{
+				this->isStatic = 1;
+				this->modifier = "protected: static";
+				sTypeCode.parse(str);
+			}
+			else if(consume(str,"M")||consume(str,"N"))
+			{
+				this->isFunction = 1;
+				this->fTypeCode2.parse(str);
+				this->modifier = "protected: virtual";
+			}
+			else if(consume(str,"Q")||consume(str,"R"))
 			{
 				this->isFunction = 1;
 				this->fTypeCode2.parse(str);
 				this->modifier = "public: ";
+			}
+			else if(consume(str,"S")||consume(str,"T")) //static -- please review/check for rules, if any
+			{
+				this->modifier = "public: static";
+				this->isStatic = 1;
+				this->sTypeCode.parse(str);
+			}
+			else if(consume(str,"U")||consume(str,"V")) //virtual
+			{
+				this->isVirtual = 1;
+				this->fTypeCode2.parse(str);
+				this->modifier = "public: virtual ";
+			}
+			else if(consume(str,"Y")||consume(str,"Z"))
+			{
+				this->isStatic = 1;
+				sTypeCode.parse(str);
 			}
 			else if(consume(str,"0"))
 			{
@@ -498,51 +494,22 @@ if (DO_DEBUG)		debug("unqualifiedTypeCode...",str);
 				this->dTypeCode.parse(str,global_backref);
 				this->modifier = "private: static "; //or just private:?
 			}
-			else if(consume(str,"2")) /* Please try to fully understand the calling conventions at work here */
-			{
-				this->isData = 1;
-				this->dTypeCode.parse(str,global_backref);
-				this->modifier = "public: static ";
-			}
 			else if(consume(str,"1")) /* Please try to fully understand the calling conventions at work here */
 			{
 				this->isData = 1;
 				this->dTypeCode.parse(str,global_backref);
 				this->modifier = "protected: static ";
 			}
-			else if(consume(str,"4") || consume(str,"3")) /* Please try to fully understand the calling conventions at work here */
+			else if(consume(str,"2")) /* Please try to fully understand the calling conventions at work here */
 			{
 				this->isData = 1;
 				this->dTypeCode.parse(str,global_backref);
+				this->modifier = "public: static ";
 			}
-			else if(consume(str,"S")) //static -- please review/check for rules, if any
+			else if(consume(str,"3") || consume(str,"4")) /* Please try to fully understand the calling conventions at work here */
 			{
-				this->modifier = "public: static";
-				this->isStatic = 1;
-				this->sTypeCode.parse(str);
-			}
-			else if(consume(str,"C")) //static -- please review/check for rules, if any
-			{
-				this->modifier = "private: static";
-				this->isStatic = 1;
-				this->sTypeCode.parse(str);
-			}
-			else if(consume(str,"Y")) //complex
-			{
-				this->isStatic = 1;
-				sTypeCode.parse(str);
-			}
-			else if(consume(str,"I")) //complex
-			{
-				this->isFunction = 1;
-				this->modifier = "protected:";
-				fTypeCode2.parse(str);
-			}
-			else if(consume(str,"U")) //virtual
-			{
-				this->isVirtual = 1;
-				this->fTypeCode2.parse(str);
-				this->modifier = "public: virtual ";
+				this->isData = 1;
+				this->dTypeCode.parse(str,global_backref);
 			}
 			else if(consume(str,"6")) //as in "6B"
 			{
@@ -556,22 +523,18 @@ if (DO_DEBUG)		debug("unqualifiedTypeCode...",str);
 				//q.parse(str);
 				return;
 			}
+			//codes 8 and 9 seem to simply return the qualification chain -- but only in wine's demangler
 		}
-		std::string toString(std::string name,std::string sC)
+		std::string toString(std::string name,std::string sC,std::string suffix)
 		{			
-			if(this->isFunction) return this->fTypeCode2.toString(name);
-		else	if(this->isVirtual) return this->fTypeCode2.toString(name);
-		else	if(this->isData) return this->dTypeCode.toString(sC,name);
-		else	if(this->isStatic)
-			{
-				return this->sTypeCode.toString(name);
-			}
+			if(this->isFunction||this->isVirtual) return this->fTypeCode2.toString(name,suffix);
+		else	if(this->isData) return this->dTypeCode.toString(sC,name,suffix);
+		else	if(this->isStatic) return this->sTypeCode.toString(name,suffix);
 		else	return sC.append(" ").append(name);
 		}
 		std::string toGCC()
 		{
-			if(this->isFunction) return this->fTypeCode2.toGCC();
-		else	if(this->isVirtual) return this->fTypeCode2.toGCC();
+			if(this->isFunction||this->isVirtual) return this->fTypeCode2.toGCC();
 		else	if(this->isData) return "";//this->dTypeCode.toGCC();
 		else	if(this->isStatic) return this->sTypeCode.toGCC();
 		else	return "";
@@ -682,7 +645,7 @@ if (DO_DEBUG)			std::cout << "Parsing basic name.\n";
 						(i=='0'||i=='1')
 					) this->operatorCode = this->operatorCode.append("\\q");
 					this->hasOperator = 1;
-					
+
 					if(str_match(this->operatorCode,"TV"))
 						this->hasOperator = 2;
 					
