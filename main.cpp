@@ -6,8 +6,13 @@
 
 /*
  * Immediate Todo:
+ * + Merge unqualifiedTypeCode, qualifiedTypeCode into a single data structure
+ * + Incorporate all function/data type codes as specified in calling_conventions
+ * + Resolve __ptr64 formatting issue (type codes may influence this)
  * - Resolve storage class / calling convention issue (prefixes/suffixes)
  * - $1 + mangled-name
+ * 
+ * 2012	12	15	home	1515	1600
  * */
  
 #include <iostream>
@@ -50,87 +55,10 @@ namespace cxx_demangler
 		'?' BasicName '@' UnqualifiedTypeCode StorageClass
 	*/
 	std::string parseMangledName(std::string &str){
-		
-if (DO_DEBUG)	debug("parsing mangled name...\t",str);
-		std::string out = "";
-		if(!consume(str,"?"))
-		{
-			std::string init_error("unidentified GCC data type code (cxx_demangler::parseMangledName())");
-			throw init_error;
-		}
-
-		basicName bN;
-		storageClass sC;
-		qualification q;
-		qualifiedTypeCode qTC;
-
-		bN.parse(str,global_backref);
-		std::string bn = bN.toString();
-if (DO_DEBUG)	debug("basicname:",bn);
-		
-		if(consume(str,"@"))
-		{
-			//basicName, scope, unqualifiedtypecode, storageclass
-			qTC.parse(str);
-			
-			sC.parse(str);
-			
-			out = out
-			.append(
-				qTC.toString
-				(
-					bn,
-					sC.toString(),
-					sC.getSuffix()
-				)
-			)
-			;
-			
-			if(GCC_MANGLE) out = bN.toGCC().append(qTC.toGCC());
-		}
-		else
-		{
-			//basicName, scope, qualification, qualifiedtypecode, storageclass
-			//scope = "public:";
-
-			q.parse(str,global_backref);
-			consume(str,"@");
-			
-if (DO_DEBUG)		debug("parsing qtc:\t",str);
-			qTC.parse(str);
-
-if (DO_DEBUG)		debug("parsing storage class:\t",str);
-			sC.parse(str);
-			
-			if(str_match(bn,"\\q")) bn = q.contents[0];
-		else	if(str_match(bn,"~\\q")) bn = std::string("~").append(q.contents[0]);
-			
-			if(!GCC_MANGLE)
-			{
-				out = out
-				.append(qTC.getModifier())
-				.append(" ")
-				.append(
-					qTC.toString
-					(
-						q.toString(global_backref).append("::").append(bn),
-						sC.toString(),
-						sC.getSuffix()
-					)
-				)
-				;
-			}
-			if(GCC_MANGLE && bN.hasOperator != 2) out = std::string("N").append(q.toGCC(global_backref)).append(bN.toGCC()).append("E").append(qTC.toGCC());
-			else if(GCC_MANGLE) out = bN.toGCC().append(std::string("N")).append(q.toGCC(global_backref)).append("E").append(qTC.toGCC());
-		}
-
-		global_backref.clear();
-if (DO_DEBUG)	std::cout << "mangled-name end\n\n";
-		out = replace(rmws(trim(out)),">>","> >");
-		out = replace(out,"^int","");
-		if(GCC_MANGLE && !NESTED) out = std::string("_Z").append(out);
-		
-		return out;
+		mangledName mN;
+		mN.parse(str,global_backref);
+		if(GCC_MANGLE) return mN.toGCC(global_backref);
+		else return mN.toString(global_backref);
 	}
 
 	std::string demangle_debug(std::string str,int code){
@@ -202,6 +130,10 @@ if (DO_DEBUG)	std::cout << "mangled-name end\n\n";
 			std::cout << "Error: " << error << "\n" << str << "\n";
 			return str_original;
 		}
+	}
+	std::string msvc2gcc(std::string name)
+	{
+		return demangle(name,1);
 	}
 }
 
