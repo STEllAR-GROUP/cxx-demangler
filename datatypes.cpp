@@ -279,9 +279,10 @@ if (DO_DEBUG)	std::cout << "Finding next data type... " << s << std::endl << std
 			else if(consume(s,"H") || consume(s,"1")) //$1?...: no documentation.
 			{	//Unknown properties according to mearie.org...
 				//Please create sub-scopes for these nested mangled names, or this may result in incorrect backreference output elsewhere.
-				std::string mN = parseMangledName(s);
+				mangledName mN;
+				mN.parse(s,backref);
 				consume(s,"@");
-				return "[mangled-name]";
+				return std::string("&");
 			}
 		}
 		

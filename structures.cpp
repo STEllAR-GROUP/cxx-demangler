@@ -839,4 +839,105 @@ if (DO_DEBUG)		debug("template-end:\t",str);
 			std::string argli = this->aL.toGCC();
 			return this->name.append("I").append(this->gcc_arguments).append("E");
 		}
+		
+	struct mangledName{
+		basicName bN;
+		storageClass sC;
+		qualification q;
+		qualifiedTypeCode qTC;
+		int qualified;
+		
+		std::string bn;
+		
+		mangledName()
+		{
+			this->qualified = 0;
+		}
+		void parse(std::string &str, std::vector<std::string> &backref)
+		{
+if (DO_DEBUG)		debug("parsing mangled name...\t",str);
+			if(!consume(str,"?"))
+			{
+				std::string init_error("unidentified GCC data type code (cxx_demangler::mangledName::parse())");
+				throw init_error;
+			}
+			this->bN.parse(str,backref);
+			this->bn = this->bN.toString();
+if (DO_DEBUG)		debug("basicname:",this->bn);
+			if(consume(str,"@"))
+			{
+				//basicName, scope, unqualifiedtypecode, storageclass
+				this->qTC.parse(str);
+				this->sC.parse(str);
+			}
+			else
+			{
+				this->qualified = 1;
+				//basicName, scope, qualification, qualifiedtypecode, storageclass
+				//scope = "public:";
+
+				this->q.parse(str,global_backref);
+				consume(str,"@");
+				
+if (DO_DEBUG)			debug("parsing qtc:\t",str);
+				this->qTC.parse(str);
+
+if (DO_DEBUG)			debug("parsing storage class:\t",str);
+				this->sC.parse(str);
+				
+				if(str_match(this->bn,"\\q")) this->bn = q.contents[0];
+			else	if(str_match(this->bn,"~\\q")) this->bn = std::string("~").append(q.contents[0]);
+			}
+
+			global_backref.clear();
+if (DO_DEBUG)		std::cout << "mangled-name end\n\n";
+		}
+		std::string toString(std::vector<std::string> &backref)
+		{
+			std::string out = "";
+			if(!this->qualified)
+			{
+				out = out
+				.append(
+					this->qTC.toString
+					(
+						this->bn,
+						this->sC.toString(),
+						this->sC.getSuffix()
+					)
+				)
+				;
+			}
+			else
+			{
+				out = out
+				.append(qTC.getModifier())
+				.append(" ")
+				.append(
+					qTC.toString
+					(
+						q.toString(global_backref).append("::").append(bn),
+						sC.toString(),
+						sC.getSuffix()
+					)
+				)
+				;
+			}
+			out = replace(rmws(trim(out)),">>","> >");
+			out = replace(out,"^int","");
+			return out;
+		}
+		std::string toGCC(std::vector<std::string> &backref)
+		{
+			std::string out = "";
+			if(!this->qualified) out = this->bN.toGCC().append(this->qTC.toGCC());
+			else
+			{
+				if(this->bN.hasOperator != 2) out = std::string("N").append(this->q.toGCC(global_backref)).append(this->bN.toGCC()).append("E").append(this->qTC.toGCC());
+				else out = this->bN.toGCC().append(std::string("N")).append(this->q.toGCC(global_backref)).append("E").append(this->qTC.toGCC());
+			}
+			if(GCC_MANGLE && !NESTED) out = std::string("_Z").append(out);
+			return out;
+		}
+	};
 }
