@@ -11,8 +11,7 @@
  * + Resolve __ptr64 formatting issue (type codes may influence this)
  * - Resolve storage class / calling convention issue (prefixes/suffixes)
  * - $1 + mangled-name
- * 
- * 2012	12	15	home	1515	1600
+ * - Document everything for future reference.
  * */
  
 #include <iostream>
@@ -158,10 +157,14 @@ int main(int argc, char** argv){
 		{
 			std::string input;
 			std::cin >> input;
-			std::cout << cxx_demangler::demangle(input,0) << "\n";
-		}
+
+			std::string output = cxx_demangler::demangle(input,0);
+            std::cout << output << "\n";
+
+
+   		}
 	}
-		
+    return 0;		
 	while(1)
 	{
 		std::string input, input2;
