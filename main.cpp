@@ -12,6 +12,7 @@
  * - Resolve storage class / calling convention issue (prefixes/suffixes)
  * - $1 + mangled-name
  * - Document everything for future reference.
+ * - Substitute tab-based indentation with space-based indentation for incorporation into HPX.
  * */
  
 #include <iostream>
@@ -37,6 +38,7 @@
 
 namespace gcc_demangler
 {
+	//Wrapper function for LLVM's GCC Demangler.
 	std::string demangle(std::string str)
 	{
 		int status;
@@ -53,6 +55,7 @@ namespace cxx_demangler
 		'?' BasicName Qualification '@' QualifiedTypeCode StorageClass
 		'?' BasicName '@' UnqualifiedTypeCode StorageClass
 	*/
+	//Parses Microsoft Visual C++ mangled names.
 	std::string parseMangledName(std::string &str){
 		mangledName mN;
 		mN.parse(str,global_backref);
@@ -60,6 +63,7 @@ namespace cxx_demangler
 		else return mN.toString(global_backref);
 	}
 
+	//Parses Microsoft Visual C++ mangled names, verifies the output with reference input expected in subsequent line.
 	std::string demangle_debug(std::string str,int code){
 		//0 - Demangle MSVC as prototype.
 		//1 - Demangle MSVC, remangle as GCC.
@@ -106,6 +110,8 @@ namespace cxx_demangler
 			return str_original;
 		}
 	}
+
+	//Parses Microsoft Visual C++ mangled names.
 	std::string demangle(std::string str,int code){
 		//0 - Demangle MSVC as prototype.
 		//1 - Demangle MSVC, remangle as GCC.
@@ -130,6 +136,8 @@ namespace cxx_demangler
 			return str_original;
 		}
 	}
+
+	//Converts Microsoft Visual C++ mangled names directly into GCC mangled names.
 	std::string msvc2gcc(std::string name)
 	{
 		return demangle(name,1);
@@ -145,6 +153,7 @@ int main(int argc, char** argv){
 	
 	if(argc>1)
 	{
+		//De-mangle each argument.
 		for(int i = 1; i < argc; i++)
 		{
 			std::string _s(argv[i]);
@@ -153,6 +162,7 @@ int main(int argc, char** argv){
 		}
 		return 0;
 
+		//De-mangle each input entered, like vc++filt.
 		while(1)
 		{
 			std::string input;
@@ -167,6 +177,7 @@ int main(int argc, char** argv){
     return 0;		
 	while(1)
 	{
+		//For debugging and verifying.
 		std::string input, input2;
 		std::cin >> input;
 		input2 = input;

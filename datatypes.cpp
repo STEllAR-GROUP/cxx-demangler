@@ -6,6 +6,7 @@
 
 namespace cxx_demangler
 {
+	//Identifies special codes and acts accordingly.
 	std::string checkExceptions(std::string s,std::string &str,std::vector<std::string> &backref)
 	{
 		if(str_match(s,"P6")) //Function Pointer

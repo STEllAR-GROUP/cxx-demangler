@@ -6,6 +6,18 @@
 
 //Should we be passing global_backref around?  What about truly nested names?
 
+/*
+References:
+
+http://www.kegel.com/mangle.html
+
+http://en.wikipedia.org/wiki/Visual_C%2B%2B_name_mangling
+
+http://www.agner.org/optimize/calling_conventions.pdf
+
+http://mearie.org/documents/mscmangle/
+*/
+
 namespace cxx_demangler
 {	
 	/* StorageClass:
@@ -58,7 +70,7 @@ namespace cxx_demangler
 				{"D",	"",	"const volatile"},
 				{"Z",	"",	"executable"},
 			};
-			int i = 0;
+		int i = 0;
 			while(options[i][0].length()>0)
 			{
 				if(str[0]=='A'||str[0]=='Z') this->display = 0;
